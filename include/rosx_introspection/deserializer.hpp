@@ -5,8 +5,8 @@
 
 #include <exception>
 
-#include "ros_msg_parser/builtin_types.hpp"
-#include "ros_msg_parser/variant.hpp"
+#include "rosx_introspection/builtin_types.hpp"
+#include "rosx_introspection/variant.hpp"
 
 namespace eprosima::fastcdr
 {

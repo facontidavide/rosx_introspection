@@ -30,8 +30,8 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "ros_msg_parser/contrib/span.hpp"
-#include "ros_msg_parser/contrib/SmallVector.h"
+#include "rosx_introspection/contrib/span.hpp"
+#include "rosx_introspection/contrib/SmallVector.h"
 
 namespace RosMsgParser{
 

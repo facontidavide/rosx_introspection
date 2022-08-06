@@ -28,7 +28,7 @@
 #include <map>
 #include <iostream>
 
-#include "ros_msg_parser/ros_message.hpp"
+#include "rosx_introspection/ros_message.hpp"
 
 // Brutally faster for numbers below 100
 inline int print_number(char* buffer, uint16_t value)

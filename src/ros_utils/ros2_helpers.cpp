@@ -1,4 +1,4 @@
-#include "ros_msg_parser/ros_utils/ros2_helpers.hpp"
+#include "rosx_introspection/ros_utils/ros2_helpers.hpp"
 #include "message_definition_cache.hpp"
 
 #include <rclcpp/rclcpp.hpp>

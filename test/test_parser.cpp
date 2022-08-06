@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
-#include "ros_msg_parser/ros_message.hpp"
-#include "ros_msg_parser/stringtree_leaf.hpp"
+#include "rosx_introspection/ros_message.hpp"
+#include "rosx_introspection/stringtree_leaf.hpp"
 
 const std::string vector_def =
   "# This represents a vector in free space. \n"

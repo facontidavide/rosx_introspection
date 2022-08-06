@@ -23,8 +23,8 @@
 
 #include <algorithm>
 #include <regex>
-#include "ros_msg_parser/ros_field.hpp"
-#include "ros_msg_parser/ros_message.hpp"
+#include "rosx_introspection/ros_field.hpp"
+#include "rosx_introspection/ros_message.hpp"
 
 namespace RosMsgParser{
 

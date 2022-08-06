@@ -3,9 +3,9 @@
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Image.h>
 
-#include "ros_msg_parser/ros_parser.hpp"
+#include "rosx_introspection/ros_parser.hpp"
 
-#include "ros_msg_parser/ros_utils/ros1_helpers.hpp"
+#include "rosx_introspection/ros_utils/ros1_helpers.hpp"
 
 using namespace RosMsgParser;
 

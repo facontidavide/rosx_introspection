@@ -2,7 +2,7 @@
 #define ROS1_HELPERS_HPP
 
 #include <ros/message_traits.h>
-#include "ros_msg_parser/ros_field.hpp"
+#include "rosx_introspection/ros_field.hpp"
 
 namespace RosMsgParser{
 

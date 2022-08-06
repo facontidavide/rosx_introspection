@@ -28,7 +28,7 @@
 #include <memory>
 #include <unordered_map>
 #include <iostream>
-#include "ros_msg_parser/ros_type.hpp"
+#include "rosx_introspection/ros_type.hpp"
 
 namespace RosMsgParser{
 

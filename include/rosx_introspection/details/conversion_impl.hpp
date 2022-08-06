@@ -38,8 +38,8 @@
 #include <type_traits>
 #include <limits>
 #include <iostream>
-#include "ros_msg_parser/builtin_types.hpp"
-#include "ros_msg_parser/details/exceptions.hpp"
+#include "rosx_introspection/builtin_types.hpp"
+#include "rosx_introspection/details/exceptions.hpp"
 
 namespace RosMsgParser
 {

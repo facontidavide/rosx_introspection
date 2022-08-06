@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(ros_introspection  LANGUAGES C CXX VERSION 2.0.0)
+project(rosx_introspection  LANGUAGES C CXX VERSION 2.0.0)
 
 # Build flags
 #---- Enable C++17 ----
@@ -39,7 +39,7 @@ endif()
 ###############################################
 ## Declare a C++ library
 ###############################################
-add_library(ros_introspection
+add_library(rosx_introspection
     ${SRC_FILES}
     src/ros_type.cpp
     src/ros_field.cpp
@@ -49,10 +49,10 @@ add_library(ros_introspection
     src/deserializer.cpp
     ${ROS_UTILS_SRC}
     )
-target_link_libraries(ros_introspection
+target_link_libraries(rosx_introspection
     fastcdr )
 
-target_include_directories(ros_introspection PUBLIC
+target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/Fast-CDR/include>
     $<INSTALL_INTERFACE:include>
@@ -73,7 +73,7 @@ if(COMPILING_WITH_CATKIN)
 
     catkin_package(
         INCLUDE_DIRS  include
-        LIBRARIES  ros_introspection
+        LIBRARIES  rosx_introspection
         CATKIN_DEPENDS ${PACKAGE_DEPEND}
         )
 
@@ -82,7 +82,7 @@ elseif( COMPILING_WITH_AMENT )
     find_package(ament_cmake REQUIRED)
     find_package(rclcpp REQUIRED)
 
-    ament_target_dependencies(ros_introspection rclcpp )
+    ament_target_dependencies(rosx_introspection rclcpp )
 
     ament_export_include_directories(include)
     ament_export_libraries(my_library)
@@ -93,8 +93,8 @@ elseif( COMPILING_WITH_AMENT )
         )
 
     install(
-        TARGETS ros_introspection
-        EXPORT ros_introspectionTargets
+        TARGETS rosx_introspection
+        EXPORT rosx_introspectionTargets
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
@@ -107,9 +107,9 @@ endif()
 ## Compile the tests
 ###############################################
 
-option(ROS_INTROSPECTION_TESTS "Compile the tests" ON)
+option(rosx_introspection_TESTS "Compile the tests" ON)
 
-if(ROS_INTROSPECTION_TESTS AND COMPILING_WITH_CATKIN )
+if(rosx_introspection_TESTS AND COMPILING_WITH_CATKIN )
 
     include_directories(${catkin_INCLUDE_DIRS})
 
@@ -118,11 +118,11 @@ if(ROS_INTROSPECTION_TESTS AND COMPILING_WITH_CATKIN )
         test/test_ros1.cpp )
 
     target_link_libraries(test_parser
-        ros_introspection
+        rosx_introspection
         ${catkin_LIBRARIES})
 endif()
 
-if(ROS_INTROSPECTION_TESTS AND COMPILING_WITH_AMENT)
+if(rosx_introspection_TESTS AND COMPILING_WITH_AMENT)
 
     find_package(rosbag2_cpp REQUIRED)
     find_package(rosidl_typesupport_cpp REQUIRED)
@@ -141,17 +141,17 @@ if(ROS_INTROSPECTION_TESTS AND COMPILING_WITH_AMENT)
         )
 
     ament_target_dependencies(test_parser ${PACKAGE_DEPEND})
-    target_link_libraries(test_parser ros_introspection )
+    target_link_libraries(test_parser rosx_introspection )
 
 endif( )
 
-if(ROS_INTROSPECTION_TESTS AND NO_ROS_DEPENDENCIES )
+if(rosx_introspection_TESTS AND NO_ROS_DEPENDENCIES )
 
     add_executable(test_parser
         test/test_parser.cpp)
 
     target_link_libraries(test_parser
-        ros_introspection)
+        rosx_introspection)
 endif()
 
 if( COMPILING_WITH_AMENT )

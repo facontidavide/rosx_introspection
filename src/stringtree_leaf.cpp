@@ -21,7 +21,7 @@
 *   SOFTWARE.
 */
 
-#include "ros_msg_parser/stringtree_leaf.hpp"
+#include "rosx_introspection/stringtree_leaf.hpp"
 
 namespace RosMsgParser
 {

@@ -24,7 +24,7 @@
 #include <string_view>
 #include <sstream>
 #include <regex>
-#include "ros_msg_parser/ros_message.hpp"
+#include "rosx_introspection/ros_message.hpp"
 
 namespace RosMsgParser{
 

@@ -2,7 +2,7 @@
 #define ROS1_HELPERS_HPP
 
 
-#include "ros_msg_parser/ros_field.hpp"
+#include "rosx_introspection/ros_field.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/typesupport_helpers.hpp>

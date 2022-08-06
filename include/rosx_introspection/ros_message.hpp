@@ -25,8 +25,8 @@
 #define ROS_INTROSPECTION_ROSMESSAGE_H
 
 #include <unordered_map>
-#include "ros_msg_parser/tree.hpp"
-#include "ros_msg_parser/ros_field.hpp"
+#include "rosx_introspection/tree.hpp"
+#include "rosx_introspection/ros_field.hpp"
 
 namespace RosMsgParser
 {

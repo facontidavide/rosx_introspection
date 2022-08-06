@@ -28,7 +28,7 @@
 #include <map>
 #include <iostream>
 #include <functional>
-#include "ros_msg_parser/variant.hpp"
+#include "rosx_introspection/variant.hpp"
 
 namespace RosMsgParser{
 

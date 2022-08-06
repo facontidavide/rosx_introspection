@@ -3,8 +3,8 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-#include "ros_msg_parser/ros_parser.hpp"
-#include "ros_msg_parser/ros_utils/ros2_helpers.hpp"
+#include "rosx_introspection/ros_parser.hpp"
+#include "rosx_introspection/ros_utils/ros2_helpers.hpp"
 
 using namespace RosMsgParser;
 
