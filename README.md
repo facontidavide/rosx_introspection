@@ -15,7 +15,7 @@ To parse any ROS message at runtime, it requires:
 
 - The name of the type (for instance "sensors_msgs/JointState")
 - The definition of the type
-  (for instance [this one](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/JointState.html)),
+  (for instance [this one](http://docs.ros.org/en/noetic/api/sensor_msgs/html/msg/JointState.html)),
 - The raw memory buffer to be deserialized into individual key/values pairs.
 
 The raw memory buffer is usually obtained by:

@@ -161,3 +161,11 @@ TEST_CASE("Parser Composite ROS1") {
   CHECK( leaf_str[index++] == "pose_stamped/pose/orientation/w");
 }
 
+TEST_CASE("Quaternion field ROS2")
+{
+  ROSField field("float64 x 0");
+
+  CHECK(field.type().typeID() == FLOAT64);
+  CHECK(field.name() == "x");
+}
+
