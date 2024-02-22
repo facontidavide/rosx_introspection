@@ -1,25 +1,25 @@
 /***** MIT License ****
-*
-*   Copyright (c) 2016-2022 Davide Faconti
-*
-*   Permission is hereby granted, free of charge, to any person obtaining a copy
-*   of this software and associated documentation files (the "Software"), to deal
-*   in the Software without restriction, including without limitation the rights
-*   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-*   copies of the Software, and to permit persons to whom the Software is
-*   furnished to do so, subject to the following conditions:
-*
-*   The above copyright notice and this permission notice shall be included in all
-*   copies or substantial portions of the Software.
-*
-*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-*   SOFTWARE.
-*/
+ *
+ *   Copyright (c) 2016-2022 Davide Faconti
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"), to deal
+ *   in the Software without restriction, including without limitation the rights
+ *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *   copies of the Software, and to permit persons to whom the Software is
+ *   furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included in all
+ *   copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *   SOFTWARE.
+ */
 
 #include <functional>
 
@@ -33,16 +33,14 @@ inline bool operator==(const std::string& a, const std::string_view& b)
   return (a.size() == b.size() && std::strncmp(a.data(), b.data(), a.size()) == 0);
 }
 
-Parser::Parser(const std::string &topic_name,
-               const ROSType &msg_type,
-               const std::string &definition)
+Parser::Parser(const std::string& topic_name, const ROSType& msg_type,
+               const std::string& definition)
   : _global_warnings(&std::cerr)
   , _topic_name(topic_name)
-  , _msg_type(msg_type)
   , _discard_large_array(DISCARD_LARGE_ARRAYS)
   , _max_array_size(100)
   , _blob_policy(STORE_BLOB_AS_COPY)
-  , _dummy_root_field( new ROSField(_msg_type, topic_name) )
+  , _dummy_root_field(new ROSField(msg_type, topic_name))
 {
   auto parsed_msgs = ParseMessageDefinitions(definition, msg_type);
   _schema = BuildMessageSchema(topic_name, parsed_msgs);
@@ -75,8 +73,7 @@ inline void ExpandVectorIfNecessary(Container& container, size_t new_size)
   }
 }
 
-bool Parser::deserialize(Span<const uint8_t> buffer,
-                         FlatMessage* flat_container,
+bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container,
                          Deserializer* deserializer) const
 {
   deserializer->init(buffer);
@@ -90,8 +87,7 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
 
   std::function<void(const ROSMessage*, FieldLeaf, bool)> deserializeImpl;
 
-  deserializeImpl = [&](const ROSMessage* msg, FieldLeaf tree_leaf, bool store)
-  {
+  deserializeImpl = [&](const ROSMessage* msg, FieldLeaf tree_leaf, bool store) {
     size_t index_s = 0;
     size_t index_m = 0;
 
@@ -138,13 +134,15 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
         }
       }
 
-      if (IS_BLOB)  // special case. This is a "blob", typically an image, a map, pointcloud, etc.
+      if (IS_BLOB)  // special case. This is a "blob", typically an image, a map,
+                    // pointcloud, etc.
       {
         ExpandVectorIfNecessary(flat_container->blob, blob_index);
 
-        if ( array_size > deserializer->bytesLeft() )
+        if (array_size > deserializer->bytesLeft())
         {
-          throw std::runtime_error("Buffer overrun in deserializeIntoFlatContainer (blob)");
+          throw std::runtime_error("Buffer overrun in deserializeIntoFlatContainer "
+                                   "(blob)");
         }
         if (DO_STORE)
         {
@@ -168,7 +166,7 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
             blob = Span<const uint8_t>(deserializer->getCurrentPtr(), array_size);
           }
         }
-        deserializer->jump( array_size );
+        deserializer->jump(array_size);
       }
       else  // NOT a BLOB
       {
@@ -189,17 +187,14 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
           {
             ExpandVectorIfNecessary(flat_container->name, name_index);
 
+            std::string str;
+            deserializer->deserializeString(str);
+
             if (DO_STORE_ARRAY)
             {
               flat_container->name[name_index].first = FieldsVector(new_tree_leaf);
-              std::string& str = flat_container->name[name_index].second;
-              deserializer->deserializeString( str );
+              flat_container->name[name_index].second = str;
               name_index++;
-            }
-            else
-            {
-              uint32_t string_size = deserializer->deserializeUInt32();
-              deserializer->jump(string_size);
             }
           }
           else if (field_type.isBuiltin())
@@ -209,13 +204,14 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
             Variant var = deserializer->deserialize(field_type.typeID());
             if (DO_STORE_ARRAY)
             {
-              flat_container->value[value_index] = std::make_pair(new_tree_leaf, std::move(var));
+              flat_container->value[value_index] =
+                  std::make_pair(new_tree_leaf, std::move(var));
               value_index++;
             }
           }
           else
           {  // field_type.typeID() == OTHER
-            auto msg_node = field.getMessagePtr( _schema->msg_library );
+            auto msg_node = field.getMessagePtr(_schema->msg_library);
             deserializeImpl(msg_node.get(), new_tree_leaf, DO_STORE_ARRAY);
           }
         }  // end for array_size
@@ -234,7 +230,8 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
 
   FieldLeaf rootnode;
   rootnode.node = _schema->field_tree.croot();
-  auto root_msg = _schema->field_tree.croot()->value()->getMessagePtr( _schema->msg_library );
+  auto root_msg =
+      _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 
   deserializeImpl(root_msg.get(), rootnode, true);
 
@@ -245,20 +242,6 @@ bool Parser::deserialize(Span<const uint8_t> buffer,
 
   return entire_message_parse;
 }
-
-
-void CreateRenamedValues(const FlatMessage& flat_msg, RenamedValues& renamed)
-{
-/*  renamed.resize(flat_msg.value.size());
-  for (size_t i = 0; i < flat_msg.value.size(); i++)
-  {
-    const auto& in = flat_msg.value[i];
-    auto& out = renamed[i];
-    in.first.toStr(out.first);
-    out.second = in.second.convert<double>();
-  }*/
-}
-
 
 
 }  // namespace RosMsgParser

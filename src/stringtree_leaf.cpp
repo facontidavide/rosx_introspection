@@ -1,25 +1,25 @@
 /***** MIT License ****
-*
-*   Copyright (c) 2016-2022 Davide Faconti
-*
-*   Permission is hereby granted, free of charge, to any person obtaining a copy
-*   of this software and associated documentation files (the "Software"), to deal
-*   in the Software without restriction, including without limitation the rights
-*   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-*   copies of the Software, and to permit persons to whom the Software is
-*   furnished to do so, subject to the following conditions:
-*
-*   The above copyright notice and this permission notice shall be included in all
-*   copies or substantial portions of the Software.
-*
-*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-*   SOFTWARE.
-*/
+ *
+ *   Copyright (c) 2016-2022 Davide Faconti
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a copy
+ *   of this software and associated documentation files (the "Software"), to deal
+ *   in the Software without restriction, including without limitation the rights
+ *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *   copies of the Software, and to permit persons to whom the Software is
+ *   furnished to do so, subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included in all
+ *   copies or substantial portions of the Software.
+ *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *   SOFTWARE.
+ */
 
 #include "rosx_introspection/stringtree_leaf.hpp"
 
@@ -29,9 +29,9 @@ namespace RosMsgParser
 FieldsVector::FieldsVector(const FieldLeaf& leaf)
 {
   auto node = leaf.node;
-  while(node && node->value())
+  while (node && node->value())
   {
-    fields.push_back( node->value() );
+    fields.push_back(node->value());
     node = node->parent();
   }
   std::reverse(fields.begin(), fields.end());
@@ -41,7 +41,7 @@ FieldsVector::FieldsVector(const FieldLeaf& leaf)
 void FieldsVector::toStr(std::string& out) const
 {
   size_t total_size = 0;
-  for(  const ROSField* field: fields)
+  for (const ROSField* field : fields)
   {
     total_size += field->name().size() + 1;
     if (field->isArray())
@@ -50,29 +50,29 @@ void FieldsVector::toStr(std::string& out) const
     }
   }
 
-  out.resize( total_size );
+  out.resize(total_size);
   char* buffer = static_cast<char*>(&out[0]);
 
   size_t array_count = 0;
   size_t offset = 0;
 
-  for(  const ROSField* field: fields)
+  for (const ROSField* field : fields)
   {
     const std::string& str = field->name();
-    bool is_root = ( field == fields.front() );
-    if( !is_root )
+    bool is_root = (field == fields.front());
+    if (!is_root)
     {
       buffer[offset++] = '/';
     }
-    std::memcpy( &buffer[offset], str.data(), str.size() );
+    std::memcpy(&buffer[offset], str.data(), str.size());
     offset += str.size();
 
-    if(!is_root && field->isArray())
+    if (!is_root && field->isArray())
     {
       buffer[offset++] = '[';
-      if( array_count < index_array.size() )
+      if (array_count < index_array.size())
       {
-        offset += print_number(&buffer[offset], index_array[ array_count++ ] );
+        offset += print_number(&buffer[offset], index_array[array_count++]);
       }
       buffer[offset++] = ']';
     }
@@ -81,14 +81,14 @@ void FieldsVector::toStr(std::string& out) const
   out.resize(offset);
 }
 
-
-//void CreateStringFromTreeLeaf(const FieldTreeLeaf &leaf, bool skip_root, std::string& out)
+// void CreateStringFromTreeLeaf(const FieldTreeLeaf &leaf, bool skip_root, std::string&
+// out)
 //{
-//  const FieldTreeNode* leaf_node = leaf.node_ptr;
-//  if( !leaf_node ){
-//      out.clear();
-//      return ;
-//  }
+//   const FieldTreeNode* leaf_node = leaf.node_ptr;
+//   if( !leaf_node ){
+//       out.clear();
+//       return ;
+//   }
 
 //  SmallVector<const std::string*, 16> strings_chain;
 
@@ -139,4 +139,4 @@ void FieldsVector::toStr(std::string& out) const
 //  out.resize(offset);
 //}
 
-}
+}  // namespace RosMsgParser
