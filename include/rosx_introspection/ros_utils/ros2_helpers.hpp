@@ -1,5 +1,5 @@
-#ifndef ROS1_HELPERS_HPP
-#define ROS1_HELPERS_HPP
+#ifndef ROS2_HELPERS_HPP
+#define ROS2_HELPERS_HPP
 
 
 #include "rosx_introspection/ros_field.hpp"
@@ -85,4 +85,4 @@ std::vector<uint8_t> BuildMessageBuffer(const T& msg, const std::string& topic_t
 
 }
 
-#endif // ROS1_HELPERS_HPP
+#endif // ROS2_HELPERS_HPP

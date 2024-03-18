@@ -20,6 +20,9 @@ else()
     message(STATUS "[FastCdr] found, version: ${fastcdr_VERSION}")
 endif()
 
+find_package(rclcpp REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rosidl_typesupport_cpp REQUIRED)
 ###############################################
 ## Declare a C++ library
 ###############################################
@@ -31,11 +34,21 @@ add_library(rosx_introspection STATIC
     src/ros_message.cpp
     src/ros_parser.cpp
     src/deserializer.cpp
+    src/ros_utils/ros2_helpers.cpp
+    src/ros_utils/message_definition_cache.cpp
+    3rdparty/Fast-CDR/src/cpp/Cdr.cpp
     )
 target_link_libraries(rosx_introspection
-    fastcdr )
+    fastcdr 
+    ${rclcpp_LIBRARIES}
+    ${rosbag2_cpp_LIBRARIES}
+    ${rosidl_typesupport_cpp_LIBRARIES}
+    )
 
 target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    ${rclcpp_INCLUDE_DIRS}
+    ${rosbag2_cpp_INCLUDE_DIRS}
+    ${rosidl_typesupport_INCLUDE_DIRS}
     )
 
