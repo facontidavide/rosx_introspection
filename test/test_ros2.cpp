@@ -157,11 +157,11 @@ TEST_CASE("Parse ROS2 JSON [JointState]")
   }
 
   std::vector<uint8_t> bufferOut= parser.serializeFromJson("joint_state", json_txt);
-
-  ros::serialization::IStream sstream(&bufferOut[0], bufferOut.size());
-  sensor_msgs::JointState joint_state_from_json;
-  ros::serialization::deserialize(sstream, joint_state_from_json);
-
+  
+  rclcpp::SerializedMessage serialized_msg(bufferOut.size());
+  std::memcpy(serialized_msg.get_rcl_serialized_message().buffer,
+                &(bufferOut[0]), bufferOut.size());
+  serialized_msg.get_rcl_serialized_message().buffer_length = bufferOut.size();
 
   auto flat_container = parser.deserialize("joint_state", Span<uint8_t>(bufferOut) );
 

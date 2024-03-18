@@ -101,11 +101,11 @@ namespace RosMsgParser
         int32_t array_size = field.arraySize();
         if (array_size == -1)
         {
-          array_size = deserializer->deserializeUInt32();
-
+          array_size = deserializer->deserializeUInt32();    
+        
           // ReadFromBuffer(buffer, buffer_offset, array_size);
         }
-
+          
         // Stop storing if it is a blob.
         if (array_size > static_cast<int32_t>(_max_array_size))
         {
@@ -290,8 +290,8 @@ namespace RosMsgParser
     return true;
   }
 
-  bool Parser::serializeFromJson(std::vector<uint8_t> &bufferOut, std::string *json_txt) const
-  {
+  bool Parser::serializeFromJson(std::vector<uint8_t> &bufferOut, std::string *json_txt, uint8_t ros_version) const
+  {      
     rapidjson::Document json_document;
     json_document.Parse(json_txt->c_str());
     rapidjson::Document::AllocatorType &alloc = json_document.GetAllocator();
@@ -332,7 +332,7 @@ namespace RosMsgParser
           buffer_data = reinterpret_cast<uint8_t *>(&array_size);
           bufferOut.insert(bufferOut.end(), buffer_data, buffer_data + sizeof(uint32_t));
         }
-
+      
         for (int i = 0; i < array_size; i++)
         {
 
@@ -506,7 +506,7 @@ namespace RosMsgParser
             else
             {
               val = new_value[field_name.s].GetFloat();
-            }
+            }            
             buffer_data = reinterpret_cast<uint8_t *>(&val);
             bufferOut.insert(bufferOut.end(), buffer_data, buffer_data + sizeof(float));
           }
@@ -568,10 +568,17 @@ namespace RosMsgParser
               len = new_value[field_name.s].GetStringLength();
             }
 
+            if(ros_version==2)
+              len+=1;
             buffer_data = reinterpret_cast<uint8_t *>(&len);
             bufferOut.insert(bufferOut.end(), buffer_data, buffer_data + sizeof(uint32_t));
-
             bufferOut.insert(bufferOut.end(), val, val + len);
+            if (ros_version==2)
+           { uint8_t remainder =4-bufferOut.size()%4;
+            if (remainder<4)
+            for( uint8_t i=0; i<remainder;i++)
+            bufferOut.push_back(0);
+            }
           }
           break;
           case OTHER:

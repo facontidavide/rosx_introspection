@@ -151,7 +151,7 @@ namespace RosMsgParser
                              bool ignore_constants = true) const;
 
     bool serializeFromJson(std::vector<uint8_t> &bufferOut,
-                           std::string *json_txt) const;
+                           std::string *json_txt, uint8_t ros_version = 1) const;
 
     typedef std::function<void(const ROSType&, Span<uint8_t>&)> VisitingCallback;
 
@@ -275,8 +275,17 @@ namespace RosMsgParser
 
         CachedPackJSON &pack = it->second;
         Parser &parser = pack.parser;
-
-        parser.serializeFromJson(pack.buffer,json_txt );
+        pack.buffer.clear();
+        uint8_t ros_version=1;
+        if (dynamic_cast<ROS2_Deserializer*>(_deserializer.get())) 
+          { 
+            ros_version=2;
+            pack.buffer.push_back(0);
+            pack.buffer.push_back(1);
+            pack.buffer.push_back(0);
+            pack.buffer.push_back(0);
+          }
+        parser.serializeFromJson(pack.buffer,json_txt, ros_version );
         return pack.buffer;
       }
       return {};
