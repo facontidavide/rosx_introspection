@@ -20,9 +20,11 @@ else()
     message(STATUS "[FastCdr] found, version: ${fastcdr_VERSION}")
 endif()
 
+if("$ENV{ROS_VERSION}" STREQUAL "2")
 find_package(rclcpp REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rosidl_typesupport_cpp REQUIRED)
+
 ###############################################
 ## Declare a C++ library
 ###############################################
@@ -52,3 +54,25 @@ target_include_directories(rosx_introspection PUBLIC
     ${rosidl_typesupport_INCLUDE_DIRS}
     )
 
+else()
+
+###############################################
+## Declare a C++ library
+###############################################
+add_library(rosx_introspection STATIC
+    ${SRC_FILES}
+    src/ros_type.cpp
+    src/ros_field.cpp
+    src/stringtree_leaf.cpp
+    src/ros_message.cpp
+    src/ros_parser.cpp
+    src/deserializer.cpp
+    )
+target_link_libraries(rosx_introspection
+    fastcdr )
+
+target_include_directories(rosx_introspection PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    )
+
+endif()
