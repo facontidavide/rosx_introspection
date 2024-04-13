@@ -21,9 +21,19 @@ else()
 endif()
 
 if("$ENV{ROS_VERSION}" STREQUAL "2")
+find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rosidl_typesupport_cpp REQUIRED)
+
+# Add include directories
+include_directories(
+    include
+    3rdparty
+    ${rclcpp_INCLUDE_DIRS}
+    ${rosbag2_cpp_INCLUDE_DIRS}
+    ${rosidl_typesupport_INCLUDE_DIRS}
+)
 
 ###############################################
 ## Declare a C++ library
@@ -40,25 +50,57 @@ add_library(rosx_introspection STATIC
     src/ros_utils/message_definition_cache.cpp
     3rdparty/Fast-CDR/src/cpp/Cdr.cpp
     )
-target_link_libraries(rosx_introspection
-    fastcdr 
-    ${rclcpp_LIBRARIES}
-    ${rosbag2_cpp_LIBRARIES}
-    ${rosidl_typesupport_cpp_LIBRARIES}
-    )
 
-target_include_directories(rosx_introspection PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    ${rclcpp_INCLUDE_DIRS}
-    ${rosbag2_cpp_INCLUDE_DIRS}
-    ${rosidl_typesupport_INCLUDE_DIRS}
-    )
+ament_target_dependencies(rosx_introspection
+    rclcpp
+    rosbag2_cpp
+    rosidl_typesupport_cpp
+)
+
+
+ament_export_targets(export_rosx_introspection HAS_LIBRARY_TARGET)
+
+# Install libraries
+install(
+    TARGETS rosx_introspection
+    EXPORT export_rosx_introspection
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+
+)
+
+# Install headers
+install(
+    DIRECTORY include/
+    DESTINATION include
+)
+install(DIRECTORY 3rdparty/rapidjson/
+        DESTINATION include/rapidjson)
+
+ament_package()
+
 
 else()
 
+find_package(catkin REQUIRED COMPONENTS
+    roscpp
+)
+
+include_directories(
+    include
+    3rdparty
+    ${catkin_INCLUDE_DIRS}
+)
 ###############################################
 ## Declare a C++ library
 ###############################################
+catkin_package(
+    INCLUDE_DIRS include 3rdparty
+    LIBRARIES rosx_introspection
+)
+
 add_library(rosx_introspection STATIC
     ${SRC_FILES}
     src/ros_type.cpp
@@ -68,11 +110,11 @@ add_library(rosx_introspection STATIC
     src/ros_parser.cpp
     src/deserializer.cpp
     )
-target_link_libraries(rosx_introspection
-    fastcdr )
 
-target_include_directories(rosx_introspection PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    )
+target_link_libraries(rosx_introspection
+    fastcdr
+    ${catkin_LIBRARIES} )
+
+
 
 endif()
