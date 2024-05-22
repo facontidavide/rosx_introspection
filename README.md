@@ -26,5 +26,3 @@ The raw memory buffer is usually obtained by:
 - [GenericSubscriber](https://github.com/ros2/rclcpp/blob/rolling/rclcpp/src/rclcpp/generic_subscription.cpp)
   or `rosbag2_storage::SerializedBagMessage` on **ROS2**.
 - [MCAP](https://github.com/foxglove/mcap).
-
-

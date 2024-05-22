@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+find_package(RapidJSON REQUIRED)
+find_package(fastcdr QUIET)
+
 if(NOT fastcdr_FOUND )
     message(STATUS "[FastCdr] not found, create shared libraries")
     # Override Fast-CDR option: compile as static lib
@@ -33,9 +36,17 @@ add_library(rosx_introspection STATIC
     src/deserializer.cpp
     )
 target_link_libraries(rosx_introspection
-    fastcdr )
+    fastcdr rapidjson)
 
 target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
 
+
+install(TARGETS rosx_introspection
+    EXPORT rosx_introspection
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+    )

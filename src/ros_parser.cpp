@@ -243,5 +243,4 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
   return entire_message_parse;
 }
 
-
 }  // namespace RosMsgParser

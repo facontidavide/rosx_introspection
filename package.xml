@@ -20,6 +20,8 @@
   <depend condition="$ROS_VERSION == 2">rosbag2_cpp</depend>
   <depend condition="$ROS_VERSION == 2">rosidl_typesupport_cpp</depend>
 
+  <depend>rapidjson-dev</depend>
+
   <depend>sensor_msgs</depend>
 
   <export>

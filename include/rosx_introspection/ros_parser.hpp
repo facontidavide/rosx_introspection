@@ -188,7 +188,6 @@ private:
 
 typedef std::vector<std::pair<std::string, double>> RenamedValues;
 
-
 template <class DeserializerT>
 class ParsersCollection
 {

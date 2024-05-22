@@ -20,19 +20,22 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace RosMsgParser {
+namespace RosMsgParser
+{
 
-struct MessageSpec {
+struct MessageSpec
+{
   MessageSpec(std::string text, const std::string& package_context);
   const std::set<std::string> dependencies;
   const std::string text;
 };
 
-class MessageDefinitionCache final {
+class MessageDefinitionCache final
+{
 public:
   /**
-   * Concatenate the message definition with its dependencies into a self-contained schema.
-   * Uses a format similar to ROS 1's gendeps:
+   * Concatenate the message definition with its dependencies into a self-contained
+   * schema. Uses a format similar to ROS 1's gendeps:
    * https://github.com/ros/ros/blob/93d8da32091b8b43702eab5d3202f4511dfeb7dc/core/roslib/src/roslib/gentools.py#L239
    */
   std::string get_full_text(const std::string& datatype);
@@ -47,6 +50,6 @@ private:
   std::unordered_map<std::string, MessageSpec> msg_specs_by_datatype_;
 };
 
-}  // namespace rosbag2_storage_mcap::internal
+}  // namespace RosMsgParser
 
 #endif  // MESSAGE_DEFINITION_CACHE_HPP_

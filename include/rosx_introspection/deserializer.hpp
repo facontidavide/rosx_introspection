@@ -65,7 +65,10 @@ class ROS_Deserializer : public Deserializer
 public:
   Variant deserialize(BuiltinType type) override;
 
-  bool isROS2() const override { return false; }
+  bool isROS2() const override
+  {
+    return false;
+  }
 
   void deserializeString(std::string& dst) override;
 
@@ -119,7 +122,10 @@ public:
 
   virtual void reset() override;
 
-  bool isROS2() const override { return true; }
+  bool isROS2() const override
+  {
+    return true;
+  }
 
 protected:
   std::shared_ptr<eprosima::fastcdr::FastBuffer> _cdr_buffer;

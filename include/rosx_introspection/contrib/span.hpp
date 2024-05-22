@@ -37,7 +37,7 @@
 #define span_HAVE_TWEAK_HEADER 1
 #else
 #define span_HAVE_TWEAK_HEADER 0
-//# pragma message("span.hpp: Note: Tweak header not supported.")
+// # pragma message("span.hpp: Note: Tweak header not supported.")
 #endif
 
 // span selection and configuration:
