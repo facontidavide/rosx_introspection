@@ -1,5 +1,4 @@
-#ifndef ROS1_HELPERS_HPP
-#define ROS1_HELPERS_HPP
+#pragma once
 
 #include <ros/message_traits.h>
 #include "rosx_introspection/ros_field.hpp"
@@ -29,5 +28,3 @@ inline std::vector<uint8_t> BuildMessageBuffer(const T& msg)
 }
 
 }  // namespace RosMsgParser
-
-#endif  // ROS1_HELPERS_HPP
