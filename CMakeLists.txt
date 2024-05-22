@@ -42,11 +42,15 @@ target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
 
-
 install(TARGETS rosx_introspection
-    EXPORT rosx_introspection
+    EXPORT rosx_introspectionConfig
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
     INCLUDES DESTINATION include
+    )
+
+install(EXPORT rosx_introspectionConfig
+    DESTINATION lib/cmake/rosx_introspection
+    FILE "rosx_introspectionConfig.cmake"
     )
