@@ -29,6 +29,9 @@
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+#include "rapidjson/reader.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/memorystream.h"
 
 namespace RosMsgParser
 {
@@ -248,7 +251,8 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
 }
 
 bool Parser::deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_txt,
-                                 Deserializer* deserializer, bool ignore_constants) const
+                                 Deserializer* deserializer, int indent,
+                                 bool ignore_constants) const
 {
   deserializer->init(buffer);
 
@@ -418,16 +422,27 @@ bool Parser::deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_t
   json_document.AddMember("topic", topic_name, alloc);
   json_document.AddMember("msg", json_node, alloc);
 
-  rapidjson::StringBuffer json_buffer;
-  json_buffer.Reserve(2048);
+  static rapidjson::StringBuffer json_buffer;
+  json_buffer.Reserve(65536);
+  json_buffer.Clear();
 
-  rapidjson::Writer<rapidjson::StringBuffer, rapidjson::UTF8<>, rapidjson::UTF8<>,
-                    rapidjson::CrtAllocator,
-                    rapidjson::kWriteDefaultFlags | rapidjson::kWriteNanAndInfFlag>
-      json_writer(json_buffer);
-  json_document.Accept(json_writer);
+  if (indent == 0)
+  {
+    rapidjson::Writer<rapidjson::StringBuffer, rapidjson::UTF8<>, rapidjson::UTF8<>,
+                      rapidjson::CrtAllocator,
+                      rapidjson::kWriteDefaultFlags | rapidjson::kWriteNanAndInfFlag>
+        json_writer(json_buffer);
+    json_document.Accept(json_writer);
 
-  *json_txt = json_buffer.GetString();
+    *json_txt = json_buffer.GetString();
+  }
+  else
+  {
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> json_writer(json_buffer);
+    json_writer.SetIndent(' ', indent);
+    json_document.Accept(json_writer);
+    *json_txt = json_buffer.GetString();
+  }
 
   return true;
 }

@@ -8,15 +8,8 @@
 
 using namespace RosMsgParser;
 
-TEST_CASE("Parse ROS2 [JointState]")
+sensor_msgs::msg::JointState BuildSampleJointState()
 {
-  ParsersCollection<ROS2_Deserializer> parser;
-
-  const std::string topic_type = "sensor_msgs/JointState";
-
-  parser.registerParser("joint_state", ROSType(topic_type),
-                        GetMessageDefinition(topic_type));
-
   sensor_msgs::msg::JointState joint_state;
 
   joint_state.header.stamp.sec = 1234;
@@ -40,6 +33,18 @@ TEST_CASE("Parse ROS2 [JointState]")
     joint_state.velocity[i] = 30 + i;
     joint_state.effort[i] = 50 + i;
   }
+  return joint_state;
+}
+
+TEST_CASE("Parse ROS2 [JointState]")
+{
+  ParsersCollection<ROS2_Deserializer> parser;
+  const std::string topic_type = "sensor_msgs/JointState";
+
+  parser.registerParser("joint_state", ROSType(topic_type),
+                        GetMessageDefinition(topic_type));
+
+  auto joint_state = BuildSampleJointState();
 
   std::vector<uint8_t> buffer = BuildMessageBuffer(joint_state, topic_type);
 
@@ -95,4 +100,21 @@ TEST_CASE("Parse ROS2 [JointState]")
 
   CHECK(flat_container->name[3].first.toStdString() == ("joint_state/name[2]"));
   CHECK(flat_container->name[3].second == ("bye"));
+}
+
+TEST_CASE("Parse ROS2 [JointState_JSON]")
+{
+  const std::string topic_type = "sensor_msgs/JointState";
+
+  Parser parser("joint_state", ROSType(topic_type), GetMessageDefinition(topic_type));
+  ROS2_Deserializer deserializer;
+
+  auto joint_state = BuildSampleJointState();
+
+  std::vector<uint8_t> buffer = BuildMessageBuffer(joint_state, topic_type);
+
+  std::string json;
+  parser.deserializeIntoJson(buffer, &json, &deserializer, 2);
+
+  std::cout << "\n JSON encoding:\n" << json << std::endl;
 }

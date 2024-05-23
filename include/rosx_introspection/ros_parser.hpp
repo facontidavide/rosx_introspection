@@ -143,7 +143,8 @@ public:
                    Deserializer* deserializer) const;
 
   bool deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_txt,
-                           Deserializer* deserializer, bool ignore_constants) const;
+                           Deserializer* deserializer, int indent = 0,
+                           bool ignore_constants = true) const;
 
   typedef std::function<void(const ROSType&, Span<uint8_t>&)> VisitingCallback;
 
