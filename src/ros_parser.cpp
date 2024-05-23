@@ -447,4 +447,130 @@ bool Parser::deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_t
   return true;
 }
 
+bool Parser::serializeFromJson(const std::string& json_string,
+                               Serializer* serializer) const
+{
+  rapidjson::Document json_document;
+  json_document.Parse(json_string.c_str());
+
+  serializer->writeHeader();
+
+  std::function<void(const ROSMessage*, rapidjson::Value&)> deserializeImpl;
+
+  deserializeImpl = [&](const ROSMessage* msg_node, rapidjson::Value& new_value) {
+    size_t index_s = 0;
+    size_t index_m = 0;
+
+    for (const ROSField& field : msg_node->fields())
+    {
+      const ROSType& field_type = field.type();
+      const auto field_name =
+          rapidjson::StringRef(field.name().data(), field.name().size());
+
+      uint32_t array_size = field.arraySize();
+
+      if (array_size == -1)
+      {
+        if (!new_value.HasMember(field_name.s))
+        {
+          std::cout << "missing member " << field_name.s << std::endl;
+          throw std::runtime_error("looks like it is a blob that wasn't serialized");
+        }
+
+        array_size = new_value[field_name.s].GetArray().Size();
+        serializer->serializeUInt32(array_size);
+      }
+
+      for (int i = 0; i < array_size; i++)
+      {
+        auto* value_field = &(new_value[field_name.s]);
+        const bool is_array = value_field->IsArray();
+        if (is_array)
+        {
+          value_field = &(value_field->GetArray()[i]);
+        }
+        const auto type_id = field_type.typeID();
+
+        switch (type_id)
+        {
+          case BOOL:
+            serializer->serialize(type_id, value_field->GetBool());
+            break;
+          case CHAR:
+            serializer->serialize(type_id, value_field->GetString()[0]);
+            break;
+
+          case BYTE:
+          case UINT8:
+          case UINT16:
+          case UINT32:
+            serializer->serialize(type_id, value_field->GetUint());
+            break;
+          case UINT64:
+            serializer->serialize(type_id, value_field->GetUint64());
+            break;
+
+            break;
+          case INT8:
+          case INT16:
+          case INT32:
+            serializer->serialize(type_id, value_field->GetInt());
+            break;
+          case INT64:
+            serializer->serialize(type_id, value_field->GetInt64());
+            break;
+
+          case FLOAT32:
+            serializer->serialize(type_id, value_field->GetFloat());
+            break;
+          case FLOAT64:
+            serializer->serialize(type_id, value_field->GetDouble());
+            break;
+
+          case DURATION:
+          case TIME: {
+            uint32_t secs = value_field->GetObject()["secs"].GetInt();
+            serializer->serializeUInt32(secs);
+
+            uint32_t nsecs = value_field->GetObject()["nsecs"].GetInt();
+            serializer->serializeUInt32(secs);
+          }
+          break;
+
+          case STRING: {
+            const char* str = value_field->GetString();
+            uint32_t len = value_field->GetStringLength();
+            serializer->serializeString(std::string(str, len));
+          }
+          break;
+          case OTHER: {
+            rapidjson::Value next_value = value_field->GetObject();
+            auto msg_node_child = field.getMessagePtr(_schema->msg_library);
+            deserializeImpl(msg_node_child.get(), next_value);
+          }
+          break;
+        }  // end switch
+
+      }  // end for array
+
+      if (field_type.typeID() == OTHER)
+      {
+        index_m++;
+      }
+      index_s++;
+    }  // end for fields
+  };   // end of lambda
+
+  FieldLeaf rootnode;
+  rootnode.node = _schema->field_tree.croot();
+  auto root_msg =
+      _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
+
+  rapidjson::Value json_root = json_document.GetObject();
+  rapidjson::Value json_msg = json_root["msg"].GetObject();
+  deserializeImpl(root_msg.get(), json_msg);
+
+  return true;
+}
+
 }  // namespace RosMsgParser

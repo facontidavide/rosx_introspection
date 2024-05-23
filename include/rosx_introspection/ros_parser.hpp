@@ -26,6 +26,7 @@
 
 #include "rosx_introspection/stringtree_leaf.hpp"
 #include "rosx_introspection/deserializer.hpp"
+#include "rosx_introspection/serializer.hpp"
 
 namespace RosMsgParser
 {
@@ -144,7 +145,9 @@ public:
 
   bool deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_txt,
                            Deserializer* deserializer, int indent = 0,
-                           bool ignore_constants = true) const;
+                           bool ignore_constants = false) const;
+
+  bool serializeFromJson(const std::string& json_string, Serializer* serializer) const;
 
   typedef std::function<void(const ROSType&, Span<uint8_t>&)> VisitingCallback;
 

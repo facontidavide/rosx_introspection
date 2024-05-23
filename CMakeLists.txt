@@ -17,6 +17,7 @@ if (ament_cmake_FOUND)
     find_package(ament_index_cpp REQUIRED)
     find_package(sensor_msgs REQUIRED)
     find_package(rclcpp REQUIRED)
+    find_package(fastcdr REQUIRED)
 
     set(EXTRA_SRC
        src/ros_utils/message_definition_cache.cpp
@@ -24,12 +25,11 @@ if (ament_cmake_FOUND)
 endif()
 
 find_package(RapidJSON REQUIRED)
-find_package(fastcdr QUIET)
 
-if(NOT fastcdr_FOUND )
-    message(STATUS "[FastCdr] not found, create shared libraries")
+if(NOT USING_ROS2 )
+    message(STATUS "[FastCdr] not found, create static libraries")
     # Override Fast-CDR option: compile as static lib
-    SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Create shared libraries by default")
+    SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Create static libraries by default")
     add_subdirectory(3rdparty/Fast-CDR)
     include_directories(3rdparty/Fast-CDR/include)
 else()
@@ -48,10 +48,11 @@ add_library(rosx_introspection STATIC
     src/ros_message.cpp
     src/ros_parser.cpp
     src/deserializer.cpp
+    src/serializer.cpp
     ${EXTRA_SRC}
     )
 
-target_link_libraries(rosx_introspection fastcdr)
+target_link_libraries(rosx_introspection )
 
 target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -61,7 +62,8 @@ if(USING_ROS2)
     ament_target_dependencies(rosx_introspection
         ament_index_cpp
         rclcpp
-        rosbag2_cpp)
+        rosbag2_cpp
+        fastcdr)
 endif()
 
 install(TARGETS rosx_introspection

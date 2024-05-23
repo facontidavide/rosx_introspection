@@ -5,8 +5,10 @@
 #if ((FASTCDR_VERSION_MAJOR < 2))
 #define get_buffer_pointer() getBufferPointer()
 #define get_current_position() getCurrentPosition()
+#define get_serialized_data_length() getSerializedDataLength()
 #define CdrVersion Cdr
 #endif
+
 namespace RosMsgParser
 {
 

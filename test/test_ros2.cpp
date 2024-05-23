@@ -21,14 +21,12 @@ sensor_msgs::msg::JointState BuildSampleJointState()
   joint_state.velocity.resize(3);
   joint_state.effort.resize(3);
 
-  std::string names[3];
-  names[0] = ("hola");
-  names[1] = ("ciao");
-  names[2] = ("bye");
+  joint_state.name[0] = "hola";
+  joint_state.name[1] = "ciao";
+  joint_state.name[2] = "bye";
 
   for (int i = 0; i < 3; i++)
   {
-    joint_state.name[i] = names[i];
     joint_state.position[i] = 10 + i;
     joint_state.velocity[i] = 30 + i;
     joint_state.effort[i] = 50 + i;
@@ -111,10 +109,33 @@ TEST_CASE("Parse ROS2 [JointState_JSON]")
 
   auto joint_state = BuildSampleJointState();
 
-  std::vector<uint8_t> buffer = BuildMessageBuffer(joint_state, topic_type);
+  std::vector<uint8_t> buffer_in = BuildMessageBuffer(joint_state, topic_type);
 
-  std::string json;
-  parser.deserializeIntoJson(buffer, &json, &deserializer, 2);
+  std::string json_text;
+  parser.deserializeIntoJson(buffer_in, &json_text, &deserializer);
 
-  std::cout << "\n JSON encoding:\n" << json << std::endl;
+  std::cout << "\n JSON encoding:\n" << json_text << std::endl;
+
+  // test round-robin transform
+  ROS2_Serializer serializer;
+  parser.serializeFromJson(json_text, &serializer);
+
+  std::vector<uint8_t> buffer_out(serializer.getBufferSize());
+  memcpy(buffer_out.data(), serializer.getBufferData(), buffer_out.size());
+
+  auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(buffer_out);
+
+  CHECK(buffer_in.size() == buffer_out.size());
+
+  CHECK(joint_state.header.frame_id == joint_state_out.header.frame_id);
+  CHECK(joint_state.header.stamp.sec == joint_state_out.header.stamp.sec);
+  CHECK(joint_state.header.stamp.nanosec == joint_state_out.header.stamp.nanosec);
+
+  for (int i = 0; i < 3; i++)
+  {
+    CHECK(joint_state.name[i] == joint_state_out.name[i]);
+    CHECK(joint_state.position[i] == joint_state_out.position[i]);
+    CHECK(joint_state.velocity[i] == joint_state_out.velocity[i]);
+    CHECK(joint_state.effort[i] == joint_state_out.effort[i]);
+  }
 }
