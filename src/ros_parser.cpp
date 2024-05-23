@@ -26,6 +26,10 @@
 #include "rosx_introspection/ros_parser.hpp"
 #include "rosx_introspection/deserializer.hpp"
 
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+
 namespace RosMsgParser
 {
 inline bool operator==(const std::string& a, const std::string_view& b)
@@ -241,6 +245,191 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
   flat_container->blob_storage.resize(blob_storage_index);
 
   return entire_message_parse;
+}
+
+bool Parser::deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_txt,
+                                 Deserializer* deserializer, bool ignore_constants) const
+{
+  deserializer->init(buffer);
+
+  rapidjson::Document json_document;
+  rapidjson::Document::AllocatorType& alloc = json_document.GetAllocator();
+
+  size_t buffer_offset = 0;
+
+  std::function<void(const ROSMessage*, rapidjson::Value&)> deserializeImpl;
+
+  deserializeImpl = [&](const ROSMessage* msg_node, rapidjson::Value& json_value) {
+    size_t index_s = 0;
+    size_t index_m = 0;
+
+    for (const ROSField& field : msg_node->fields())
+    {
+      if (field.isConstant() && ignore_constants)
+      {
+        continue;
+      }
+
+      const ROSType& field_type = field.type();
+      auto field_name = rapidjson::StringRef(field.name().data(), field.name().size());
+
+      int32_t array_size = field.arraySize();
+      if (array_size == -1)
+      {
+        array_size = deserializer->deserializeUInt32();
+      }
+
+      // Stop storing if it is a blob.
+      if (array_size > static_cast<int32_t>(_max_array_size))
+      {
+        if (buffer_offset + array_size > static_cast<std::size_t>(buffer.size()))
+        {
+          throw std::runtime_error("Buffer overrun in blob");
+        }
+        buffer_offset += array_size;
+      }
+      else  // NOT a BLOB
+      {
+        rapidjson::Value array_value(rapidjson::kArrayType);
+
+        for (int i = 0; i < array_size; i++)
+        {
+          rapidjson::Value new_value;
+          new_value.SetObject();
+
+          switch (field_type.typeID())
+          {
+            case BOOL:
+              new_value.SetBool(
+                  deserializer->deserialize(field_type.typeID()).convert<uint8_t>());
+              break;
+            case CHAR: {
+              char c = deserializer->deserialize(field_type.typeID()).convert<int8_t>();
+              new_value.SetString(&c, 1, alloc);
+            }
+            break;
+            case BYTE:
+            case UINT8:
+            case UINT16:
+            case UINT32:
+              new_value.SetUint(
+                  (deserializer->deserialize(field_type.typeID()).convert<uint32_t>()));
+              break;
+            case UINT64:
+              new_value.SetUint64(
+                  (deserializer->deserialize(field_type.typeID()).convert<uint64_t>()));
+              break;
+            case INT8:
+            case INT16:
+            case INT32:
+              new_value.SetInt(
+                  (deserializer->deserialize(field_type.typeID()).convert<int32_t>()));
+              break;
+            case INT64:
+              new_value.SetInt64(
+                  (deserializer->deserialize(field_type.typeID()).convert<int64_t>()));
+              break;
+            case FLOAT32:
+              new_value.SetFloat(
+                  (deserializer->deserialize(field_type.typeID()).convert<float>()));
+              break;
+            case FLOAT64:
+              new_value.SetDouble(
+                  (deserializer->deserialize(field_type.typeID()).convert<double>()));
+              break;
+            case TIME: {
+              int sec = deserializer->deserialize(INT32).convert<int32_t>();
+              int nsec = deserializer->deserialize(INT32).convert<int32_t>();
+              rapidjson::Value sec_Value;
+              sec_Value.SetObject();
+              sec_Value.SetInt(sec);
+              new_value.AddMember("secs", sec_Value, alloc);
+
+              rapidjson::Value nsec_value;
+              nsec_value.SetObject();
+              nsec_value.SetInt(nsec);
+              new_value.AddMember("nsecs", nsec_value, alloc);
+            }
+            break;
+            case DURATION: {
+              int sec = deserializer->deserialize(INT32).convert<int32_t>();
+              int nsec = deserializer->deserialize(INT32).convert<int32_t>();
+              rapidjson::Value sec_Value;
+              sec_Value.SetObject();
+              sec_Value.SetInt(sec);
+              new_value.AddMember("secs", sec_Value, alloc);
+
+              rapidjson::Value nsec_value;
+              nsec_value.SetObject();
+              nsec_value.SetInt(nsec);
+              new_value.AddMember("nsecs", nsec_value, alloc);
+            }
+            break;
+
+            case STRING: {
+              std::string s;
+              deserializer->deserializeString(s);
+              new_value.SetString(s.c_str(), s.length(), alloc);
+            }
+            break;
+            case OTHER: {
+              auto msg_node_child = field.getMessagePtr(_schema->msg_library);
+              deserializeImpl(msg_node_child.get(), new_value);
+            }
+            break;
+          }  // end switch
+
+          if (field.isArray())
+          {
+            array_value.PushBack(new_value, alloc);
+          }
+          else
+          {
+            json_value.AddMember(field_name, new_value, alloc);
+          }
+        }  // end for array
+
+        if (field.isArray())
+        {
+          json_value.AddMember(field_name, array_value, alloc);
+        }
+      }  // end for array_size
+
+      if (field_type.typeID() == OTHER)
+      {
+        index_m++;
+      }
+      index_s++;
+    }  // end for fields
+  };   // end of lambda
+
+  FieldLeaf rootnode;
+  rootnode.node = _schema->field_tree.croot();
+  auto root_msg =
+      _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
+
+  json_document.SetObject();
+  rapidjson::Value json_node;
+  json_node.SetObject();
+
+  deserializeImpl(root_msg.get(), json_node);
+
+  auto topic_name = rapidjson::StringRef(_topic_name.data(), _topic_name.size());
+  json_document.AddMember("topic", topic_name, alloc);
+  json_document.AddMember("msg", json_node, alloc);
+
+  rapidjson::StringBuffer json_buffer;
+  json_buffer.Reserve(2048);
+
+  rapidjson::Writer<rapidjson::StringBuffer, rapidjson::UTF8<>, rapidjson::UTF8<>,
+                    rapidjson::CrtAllocator,
+                    rapidjson::kWriteDefaultFlags | rapidjson::kWriteNanAndInfFlag>
+      json_writer(json_buffer);
+  json_document.Accept(json_writer);
+
+  *json_txt = json_buffer.GetString();
+
+  return true;
 }
 
 }  // namespace RosMsgParser

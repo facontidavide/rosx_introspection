@@ -128,7 +128,7 @@ public:
    * IMPORTANT: this approach is not meant to be used with use arrays such as maps,
    * point clouds and images.For this reason the argument max_array_size is used.
    *
-   * This funtion is almost always followed by CreateRenamedValues,
+   * This function is almost always followed by CreateRenamedValues,
    * which provide a more human-readable key-value representation.
    *
    * @param buffer         raw memory to be parsed.
@@ -141,6 +141,9 @@ public:
    */
   bool deserialize(Span<const uint8_t> buffer, FlatMessage* flat_output,
                    Deserializer* deserializer) const;
+
+  bool deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_txt,
+                           Deserializer* deserializer, bool ignore_constants) const;
 
   typedef std::function<void(const ROSType&, Span<uint8_t>&)> VisitingCallback;
 
@@ -185,6 +188,8 @@ private:
 
   std::unique_ptr<Deserializer> _deserializer;
 };
+
+//--------------------------------------------------------------------------
 
 typedef std::vector<std::pair<std::string, double>> RenamedValues;
 
