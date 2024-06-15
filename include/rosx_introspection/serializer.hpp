@@ -3,7 +3,7 @@
 // API adapted to FastCDR
 
 #include <exception>
-
+#include <vector>
 #include "rosx_introspection/builtin_types.hpp"
 #include "rosx_introspection/variant.hpp"
 
