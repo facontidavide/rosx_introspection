@@ -40,7 +40,7 @@ public:
 
 //-----------------------------------------------------------------
 
-// Specialization od serializer that works with ROS1
+// Specialization of serializer that works with ROS1
 class ROS_Serializer : public Serializer
 {
 public:

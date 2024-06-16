@@ -15,7 +15,6 @@ if (ament_cmake_FOUND)
     set(USING_ROS2 TRUE)
     find_package(rosbag2_cpp REQUIRED)
     find_package(ament_index_cpp REQUIRED)
-    find_package(sensor_msgs REQUIRED)
     find_package(rclcpp REQUIRED)
     find_package(fastcdr REQUIRED)
 
@@ -52,12 +51,6 @@ add_library(rosx_introspection STATIC
     ${EXTRA_SRC}
     )
 
-target_link_libraries(rosx_introspection )
-
-target_include_directories(rosx_introspection PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    )
-
 if(USING_ROS2)
     ament_target_dependencies(rosx_introspection
         ament_index_cpp
@@ -66,28 +59,49 @@ if(USING_ROS2)
         fastcdr)
 endif()
 
-install(TARGETS rosx_introspection
-    EXPORT rosx_introspection
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
+target_include_directories(rosx_introspection PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
 
+
 ###############################################
-## Tests
+## Install and Tests
 ###############################################
 
 if(USING_ROS2)
-    add_executable(rosx_introspection_test
-        test/test_parser.cpp
-        test/test_ros2.cpp )
 
-    ament_target_dependencies(rosx_introspection_test sensor_msgs)
+    if(BUILD_TESTING)
+        
+        find_package(sensor_msgs REQUIRED)
+        find_package(geometry_msgs REQUIRED)
+        find_package(ament_cmake_gtest REQUIRED)
+        
+        ament_add_gtest(rosx_introspection_test
+            test/test_parser.cpp
+            test/test_ros2.cpp )
 
-    target_link_libraries(rosx_introspection_test rosx_introspection)
+        ament_target_dependencies(rosx_introspection_test sensor_msgs geometry_msgs)
+        target_link_libraries(rosx_introspection_test rosx_introspection)
 
-    target_include_directories(rosx_introspection_test PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/doctest>)
+        target_include_directories(rosx_introspection_test PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+    endif()
+
+    install(
+        DIRECTORY include/
+        DESTINATION include
+        )
+
+    install(TARGETS rosx_introspection
+        EXPORT rosx_introspectionTargets
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include
+        )
+
+    ament_export_targets(rosx_introspectionTargets HAS_LIBRARY_TARGET)
+    ament_export_dependencies(ament_index_cpp rosbag2_cpp fastcdr)
+    ament_package()
+
 endif()

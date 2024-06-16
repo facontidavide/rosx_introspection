@@ -1,6 +1,6 @@
 /***** MIT License ****
  *
- *   Copyright (c) 2016-2022 Davide Faconti
+ *   Copyright (c) 2016-2024 Davide Faconti
  *
  *   Permission is hereby granted, free of charge, to any person obtaining a copy
  *   of this software and associated documentation files (the "Software"), to deal
@@ -412,15 +412,8 @@ bool Parser::deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_t
   auto root_msg =
       _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 
-  json_document.SetObject();
-  rapidjson::Value json_node;
-  json_node.SetObject();
-
+  rapidjson::Value& json_node = json_document.SetObject();
   deserializeImpl(root_msg.get(), json_node);
-
-  auto topic_name = rapidjson::StringRef(_topic_name.data(), _topic_name.size());
-  json_document.AddMember("topic", topic_name, alloc);
-  json_document.AddMember("msg", json_node, alloc);
 
   static rapidjson::StringBuffer json_buffer;
   json_buffer.Reserve(65536);
@@ -447,49 +440,60 @@ bool Parser::deserializeIntoJson(Span<const uint8_t> buffer, std::string* json_t
   return true;
 }
 
-bool Parser::serializeFromJson(const std::string& json_string,
+bool Parser::serializeFromJson(const std::string_view json_string,
                                Serializer* serializer) const
 {
   rapidjson::Document json_document;
-  json_document.Parse(json_string.c_str());
+  json_document.Parse(json_string.data());
 
   serializer->writeHeader();
 
-  std::function<void(const ROSMessage*, rapidjson::Value&)> deserializeImpl;
+  std::function<void(const ROSMessage*, rapidjson::Value*)> serializeImpl;
 
-  deserializeImpl = [&](const ROSMessage* msg_node, rapidjson::Value& new_value) {
+  serializeImpl = [&](const ROSMessage* msg_node, rapidjson::Value* json_value) {
     size_t index_s = 0;
     size_t index_m = 0;
 
     for (const ROSField& field : msg_node->fields())
     {
+      if (field.isConstant())
+      {
+        continue;
+      }
       const ROSType& field_type = field.type();
       const auto field_name =
           rapidjson::StringRef(field.name().data(), field.name().size());
 
-      uint32_t array_size = field.arraySize();
+      const bool has_json_value =  json_value && json_value->HasMember(field_name.s);
+      const bool is_array = field.isArray();
+      const bool is_dynamic_array = is_array && field.arraySize() == -1;
+      const bool is_fixed_array = is_array && field.arraySize() != -1;
 
-      if (array_size == -1)
+      // both must be array or not array
+      if(has_json_value && (is_array != (*json_value)[field_name.s].IsArray()))
       {
-        if (!new_value.HasMember(field_name.s))
-        {
-          std::cout << "missing member " << field_name.s << std::endl;
-          throw std::runtime_error("looks like it is a blob that wasn't serialized");
-        }
+        throw std::runtime_error(std::string("IsArray() mismatch in field: ") + field.name());
+      }
 
-        array_size = new_value[field_name.s].GetArray().Size();
+      uint32_t array_size = field.arraySize();
+      if (is_dynamic_array)
+      {
+        // if not present in the JSON, we will add an array size of 0
+        array_size = has_json_value ? (*json_value)[field_name.s].GetArray().Size() : 0;
         serializer->serializeUInt32(array_size);
       }
+      const auto type_id = field_type.typeID();
 
       for (int i = 0; i < array_size; i++)
       {
-        auto* value_field = &(new_value[field_name.s]);
-        const bool is_array = value_field->IsArray();
-        if (is_array)
+        // is !has_json_value , we will serialize a zero value
+        rapidjson::Value zero_value = rapidjson::Value(0);
+        rapidjson::Value* value_field = &zero_value;
+        
+        if(has_json_value)
         {
-          value_field = &(value_field->GetArray()[i]);
+          value_field = is_array ? &((*json_value)[field_name.s].GetArray()[i]) : &((*json_value)[field_name.s]);
         }
-        const auto type_id = field_type.typeID();
 
         switch (type_id)
         {
@@ -502,7 +506,11 @@ bool Parser::serializeFromJson(const std::string& json_string,
 
           case BYTE:
           case UINT8:
+            serializer->serialize(type_id, uint8_t(value_field->GetUint()));
+            break;
           case UINT16:
+            serializer->serialize(type_id, uint16_t(value_field->GetUint()));
+            break;
           case UINT32:
             serializer->serialize(type_id, value_field->GetUint());
             break;
@@ -512,7 +520,11 @@ bool Parser::serializeFromJson(const std::string& json_string,
 
             break;
           case INT8:
+            serializer->serialize(type_id, int8_t(value_field->GetUint()));
+            break;
           case INT16:
+            serializer->serialize(type_id, int16_t(value_field->GetUint()));
+            break;
           case INT32:
             serializer->serialize(type_id, value_field->GetInt());
             break;
@@ -538,19 +550,31 @@ bool Parser::serializeFromJson(const std::string& json_string,
           break;
 
           case STRING: {
-            const char* str = value_field->GetString();
-            uint32_t len = value_field->GetStringLength();
-            serializer->serializeString(std::string(str, len));
+            if(has_json_value)
+            {
+              const char* str = value_field->GetString();
+              uint32_t len = value_field->GetStringLength();
+              serializer->serializeString(std::string(str, len));
+            }
+            else
+            {
+              serializer->serializeString("");
+            }
           }
           break;
           case OTHER: {
-            rapidjson::Value next_value = value_field->GetObject();
             auto msg_node_child = field.getMessagePtr(_schema->msg_library);
-            deserializeImpl(msg_node_child.get(), next_value);
+            if(!has_json_value)
+            {
+              serializeImpl(msg_node_child.get(), nullptr);
+            }
+            else {
+              rapidjson::Value next_value = value_field->GetObject();
+              serializeImpl(msg_node_child.get(), &next_value);
+            }
           }
           break;
         }  // end switch
-
       }  // end for array
 
       if (field_type.typeID() == OTHER)
@@ -561,14 +585,11 @@ bool Parser::serializeFromJson(const std::string& json_string,
     }  // end for fields
   };   // end of lambda
 
-  FieldLeaf rootnode;
-  rootnode.node = _schema->field_tree.croot();
   auto root_msg =
       _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 
   rapidjson::Value json_root = json_document.GetObject();
-  rapidjson::Value json_msg = json_root["msg"].GetObject();
-  deserializeImpl(root_msg.get(), json_msg);
+  serializeImpl(root_msg.get(), &json_root);
 
   return true;
 }

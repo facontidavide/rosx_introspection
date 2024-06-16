@@ -147,7 +147,7 @@ public:
                            Deserializer* deserializer, int indent = 0,
                            bool ignore_constants = false) const;
 
-  bool serializeFromJson(const std::string& json_string, Serializer* serializer) const;
+  bool serializeFromJson(const std::string_view json_string, Serializer* serializer) const;
 
   typedef std::function<void(const ROSType&, Span<uint8_t>&)> VisitingCallback;
 

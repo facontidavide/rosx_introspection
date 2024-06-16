@@ -15,13 +15,15 @@
   <depend condition="$ROS_VERSION == 1">roscpp</depend>
   <depend condition="$ROS_VERSION == 1">roscpp_serialization</depend>
 
+  <depend condition="$ROS_VERSION == 2">ament_index_cpp</depend>
   <depend condition="$ROS_VERSION == 2">rclcpp</depend>
   <depend condition="$ROS_VERSION == 2">rosbag2_cpp</depend>
-  <depend condition="$ROS_VERSION == 2">ament_index_cpp</depend>
+  <depend condition="$ROS_VERSION == 2">fastcdr</depend>
 
   <depend>rapidjson-dev</depend>
 
-  <depend>sensor_msgs</depend>
+  <test_depend>sensor_msgs</test_depend>
+  <test_depend>geometry_msgs</test_depend>
 
   <export>
        <build_type condition="$ROS_VERSION == 1">catkin</build_type>

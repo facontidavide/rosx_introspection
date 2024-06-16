@@ -1,5 +1,5 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
+#include <gtest/gtest.h>
+
 #include "rosx_introspection/ros_message.hpp"
 #include "rosx_introspection/stringtree_leaf.hpp"
 
@@ -20,19 +20,19 @@ const std::string vector_def = "# This represents a vector in free space. \n"
 
 using namespace RosMsgParser;
 
-TEST_CASE("Parser basic test")
+TEST(Parser, BasicTest)
 {
   ROSMessage msg(vector_def);
 
-  CHECK(msg.fields().size() == 3);
+  ASSERT_EQ(msg.fields().size(), 3);
 
-  CHECK(msg.field(0).name() == "x");
-  CHECK(msg.field(1).name() == "y");
-  CHECK(msg.field(2).name() == "z");
+  ASSERT_EQ(msg.field(0).name(), "x");
+  ASSERT_EQ(msg.field(1).name(), "y");
+  ASSERT_EQ(msg.field(2).name(), "z");
 
-  CHECK(msg.field(0).type().typeID() == FLOAT64);
-  CHECK(msg.field(1).type().typeID() == FLOAT64);
-  CHECK(msg.field(2).type().typeID() == FLOAT64);
+  ASSERT_EQ(msg.field(0).type().typeID(), FLOAT64);
+  ASSERT_EQ(msg.field(1).type().typeID(), FLOAT64);
+  ASSERT_EQ(msg.field(2).type().typeID(), FLOAT64);
 }
 
 const std::string pose_stamped_def = "# A Pose with reference coordinate frame and "
@@ -90,12 +90,12 @@ const std::string pose_stamped_def = "# A Pose with reference coordinate frame a
                                      "float64 z\n"
                                      "float64 w\n";
 
-TEST_CASE("Parser Composite ROS1")
+TEST(Parser, CompositeROS1)
 {
   auto msg_parsed = ParseMessageDefinitions(pose_stamped_def, ROSType("geometry_msgs/"
                                                                       "PoseStamped"));
 
-  CHECK(msg_parsed.size() == 5);
+  ASSERT_EQ(msg_parsed.size(), 5);
 
   auto pose_stamped = msg_parsed[0];
   auto header = msg_parsed[1];
@@ -103,39 +103,39 @@ TEST_CASE("Parser Composite ROS1")
   auto point = msg_parsed[3];
   auto quaternion = msg_parsed[4];
 
-  CHECK(pose_stamped->type().baseName() == "geometry_msgs/PoseStamped");
-  CHECK(pose_stamped->fields().size() == 2);
-  CHECK(pose_stamped->field(0).type().baseName() == "std_msgs/Header");
-  CHECK(pose_stamped->field(1).type().baseName() == "geometry_msgs/Pose");
+  ASSERT_EQ(pose_stamped->type().baseName(), "geometry_msgs/PoseStamped");
+  ASSERT_EQ(pose_stamped->fields().size(), 2);
+  ASSERT_EQ(pose_stamped->field(0).type().baseName(), "std_msgs/Header");
+  ASSERT_EQ(pose_stamped->field(1).type().baseName(), "geometry_msgs/Pose");
 
-  CHECK(header->type().baseName() == "std_msgs/Header");
-  CHECK(header->fields().size() == 3);
-  CHECK(header->field(0).type().baseName() == "uint32");
-  CHECK(header->field(1).type().baseName() == "time");
-  CHECK(header->field(2).type().baseName() == "string");
+  ASSERT_EQ(header->type().baseName(), "std_msgs/Header");
+  ASSERT_EQ(header->fields().size(), 3);
+  ASSERT_EQ(header->field(0).type().baseName(), "uint32");
+  ASSERT_EQ(header->field(1).type().baseName(), "time");
+  ASSERT_EQ(header->field(2).type().baseName(), "string");
 
-  CHECK(pose->type().baseName() == "geometry_msgs/Pose");
-  CHECK(pose->fields().size() == 2);
-  CHECK(pose->field(0).type().baseName() == "geometry_msgs/Point");
-  CHECK(pose->field(1).type().baseName() == "geometry_msgs/Quaternion");
+  ASSERT_EQ(pose->type().baseName(), "geometry_msgs/Pose");
+  ASSERT_EQ(pose->fields().size(), 2);
+  ASSERT_EQ(pose->field(0).type().baseName(), "geometry_msgs/Point");
+  ASSERT_EQ(pose->field(1).type().baseName(), "geometry_msgs/Quaternion");
 
-  CHECK(point->type().baseName() == "geometry_msgs/Point");
-  CHECK(point->fields().size() == 3);
-  CHECK(point->field(0).type().baseName() == "float64");
-  CHECK(point->field(1).type().baseName() == "float64");
-  CHECK(point->field(2).type().baseName() == "float64");
+  ASSERT_EQ(point->type().baseName(), "geometry_msgs/Point");
+  ASSERT_EQ(point->fields().size(), 3);
+  ASSERT_EQ(point->field(0).type().baseName(), "float64");
+  ASSERT_EQ(point->field(1).type().baseName(), "float64");
+  ASSERT_EQ(point->field(2).type().baseName(), "float64");
 
-  CHECK(quaternion->type().baseName() == "geometry_msgs/Quaternion");
-  CHECK(quaternion->fields().size() == 4);
-  CHECK(quaternion->field(0).type().baseName() == "float64");
-  CHECK(quaternion->field(1).type().baseName() == "float64");
-  CHECK(quaternion->field(2).type().baseName() == "float64");
-  CHECK(quaternion->field(3).type().baseName() == "float64");
+  ASSERT_EQ(quaternion->type().baseName(), "geometry_msgs/Quaternion");
+  ASSERT_EQ(quaternion->fields().size(), 4);
+  ASSERT_EQ(quaternion->field(0).type().baseName(), "float64");
+  ASSERT_EQ(quaternion->field(1).type().baseName(), "float64");
+  ASSERT_EQ(quaternion->field(2).type().baseName(), "float64");
+  ASSERT_EQ(quaternion->field(3).type().baseName(), "float64");
 
   //--------------------------------------
   MessageSchema::Ptr schema = BuildMessageSchema("pose_stamped", msg_parsed);
 
-  CHECK(schema->field_tree.root()->children().size() == 2);
+  ASSERT_EQ(schema->field_tree.root()->children().size(), 2);
 
   std::vector<std::string> leaf_str;
 
@@ -158,27 +158,27 @@ TEST_CASE("Parser Composite ROS1")
   };
   recursiveLeaf(schema->field_tree.root());
 
-  CHECK(leaf_str.size() == 10);
+  ASSERT_EQ(leaf_str.size(), 10);
 
   size_t index = 0;
-  CHECK(leaf_str[index++] == "pose_stamped/header/seq");
-  CHECK(leaf_str[index++] == "pose_stamped/header/stamp");
-  CHECK(leaf_str[index++] == "pose_stamped/header/frame_id");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/header/seq");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/header/stamp");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/header/frame_id");
 
-  CHECK(leaf_str[index++] == "pose_stamped/pose/position/x");
-  CHECK(leaf_str[index++] == "pose_stamped/pose/position/y");
-  CHECK(leaf_str[index++] == "pose_stamped/pose/position/z");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/position/x");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/position/y");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/position/z");
 
-  CHECK(leaf_str[index++] == "pose_stamped/pose/orientation/x");
-  CHECK(leaf_str[index++] == "pose_stamped/pose/orientation/y");
-  CHECK(leaf_str[index++] == "pose_stamped/pose/orientation/z");
-  CHECK(leaf_str[index++] == "pose_stamped/pose/orientation/w");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/orientation/x");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/orientation/y");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/orientation/z");
+  ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/orientation/w");
 }
 
-TEST_CASE("Quaternion field ROS2")
+TEST(Parser, QuaternionFieldROS2)
 {
   ROSField field("float64 x 0");
 
-  CHECK(field.type().typeID() == FLOAT64);
-  CHECK(field.name() == "x");
+  ASSERT_EQ(field.type().typeID(), FLOAT64);
+  ASSERT_EQ(field.name(), "x");
 }
