@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(rosx_introspection  LANGUAGES C CXX VERSION 2.0.0)
+project(rosx_introspection  LANGUAGES C CXX VERSION 1.0.0)
 
 # Build flags
 #---- Enable C++17 ----
