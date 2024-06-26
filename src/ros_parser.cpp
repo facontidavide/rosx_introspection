@@ -464,15 +464,16 @@ bool Parser::serializeFromJson(const std::string_view json_string,
       const auto field_name =
           rapidjson::StringRef(field.name().data(), field.name().size());
 
-      const bool has_json_value =  json_value && json_value->HasMember(field_name.s);
+      const bool has_json_value = json_value && json_value->HasMember(field_name.s);
       const bool is_array = field.isArray();
       const bool is_dynamic_array = is_array && field.arraySize() == -1;
       const bool is_fixed_array = is_array && field.arraySize() != -1;
 
       // both must be array or not array
-      if(has_json_value && (is_array != (*json_value)[field_name.s].IsArray()))
+      if (has_json_value && (is_array != (*json_value)[field_name.s].IsArray()))
       {
-        throw std::runtime_error(std::string("IsArray() mismatch in field: ") + field.name());
+        throw std::runtime_error(std::string("IsArray() mismatch in field: ") +
+                                 field.name());
       }
 
       uint32_t array_size = field.arraySize();
@@ -482,6 +483,16 @@ bool Parser::serializeFromJson(const std::string_view json_string,
         array_size = has_json_value ? (*json_value)[field_name.s].GetArray().Size() : 0;
         serializer->serializeUInt32(array_size);
       }
+      if (has_json_value && is_fixed_array)
+      {
+        int actual_size = (*json_value)[field_name.s].GetArray().Size();
+        if (array_size != actual_size)
+        {
+          throw std::runtime_error(std::string("Fixed array size mismatch in field: ") +
+                                   field.name());
+        }
+      }
+
       const auto type_id = field_type.typeID();
 
       for (int i = 0; i < array_size; i++)
@@ -489,10 +500,11 @@ bool Parser::serializeFromJson(const std::string_view json_string,
         // is !has_json_value , we will serialize a zero value
         rapidjson::Value zero_value = rapidjson::Value(0);
         rapidjson::Value* value_field = &zero_value;
-        
-        if(has_json_value)
+
+        if (has_json_value)
         {
-          value_field = is_array ? &((*json_value)[field_name.s].GetArray()[i]) : &((*json_value)[field_name.s]);
+          value_field = is_array ? &((*json_value)[field_name.s].GetArray()[i]) :
+                                   &((*json_value)[field_name.s]);
         }
 
         switch (type_id)
@@ -550,7 +562,7 @@ bool Parser::serializeFromJson(const std::string_view json_string,
           break;
 
           case STRING: {
-            if(has_json_value)
+            if (has_json_value)
             {
               const char* str = value_field->GetString();
               uint32_t len = value_field->GetStringLength();
@@ -564,18 +576,19 @@ bool Parser::serializeFromJson(const std::string_view json_string,
           break;
           case OTHER: {
             auto msg_node_child = field.getMessagePtr(_schema->msg_library);
-            if(!has_json_value)
+            if (!has_json_value)
             {
               serializeImpl(msg_node_child.get(), nullptr);
             }
-            else {
+            else
+            {
               rapidjson::Value next_value = value_field->GetObject();
               serializeImpl(msg_node_child.get(), &next_value);
             }
           }
           break;
         }  // end switch
-      }  // end for array
+      }    // end for array
 
       if (field_type.typeID() == OTHER)
       {

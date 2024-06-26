@@ -71,11 +71,11 @@ target_include_directories(rosx_introspection PUBLIC
 if(USING_ROS2)
 
     if(BUILD_TESTING)
-        
+
         find_package(sensor_msgs REQUIRED)
         find_package(geometry_msgs REQUIRED)
         find_package(ament_cmake_gtest REQUIRED)
-        
+
         ament_add_gtest(rosx_introspection_test
             test/test_parser.cpp
             test/test_ros2.cpp )

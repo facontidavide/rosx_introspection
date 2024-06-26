@@ -59,9 +59,12 @@ TEST(ParseROS2, JointState)
   }
 
   ASSERT_EQ(flat_container->value[0].first.toStdString(), "joint_state/header/stamp/sec");
-  ASSERT_EQ(flat_container->value[0].second.convert<uint32_t>(), joint_state.header.stamp.sec);
-  ASSERT_EQ(flat_container->value[1].first.toStdString(), "joint_state/header/stamp/nanosec");
-  ASSERT_EQ(flat_container->value[1].second.convert<uint32_t>(), joint_state.header.stamp.nanosec);
+  ASSERT_EQ(flat_container->value[0].second.convert<uint32_t>(),
+            joint_state.header.stamp.sec);
+  ASSERT_EQ(flat_container->value[1].first.toStdString(), "joint_state/header/stamp/"
+                                                          "nanosec");
+  ASSERT_EQ(flat_container->value[1].second.convert<uint32_t>(),
+            joint_state.header.stamp.nanosec);
 
   ASSERT_EQ(flat_container->value[2].first.toStdString(), ("joint_state/position[0]"));
   ASSERT_EQ(flat_container->value[2].second.convert<int>(), 10);
@@ -137,7 +140,6 @@ TEST(ParseROS2, JointState_JSON)
   }
 }
 
-
 TEST(ParseROS2, JointState_JSON_Omitted)
 {
   const char* joint_state_json = R"(
@@ -159,7 +161,7 @@ TEST(ParseROS2, JointState_JSON_Omitted)
 
   auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(buffer_out);
 
-  ASSERT_EQ("", joint_state_out.header.frame_id); // default
+  ASSERT_EQ("", joint_state_out.header.frame_id);  // default
   ASSERT_EQ(1234, joint_state_out.header.stamp.sec);
   ASSERT_EQ(567000000, joint_state_out.header.stamp.nanosec);
 
@@ -179,7 +181,7 @@ TEST(ParseROS2, JointState_JSON_Omitted)
 
 TEST(ParseROS2, PoseStamped_JSON)
 {
-const std::string topic_type = "geometry_msgs/PoseStamped";
+  const std::string topic_type = "geometry_msgs/PoseStamped";
 
   Parser parser("joint_state", ROSType(topic_type), GetMessageDefinition(topic_type));
   ROS2_Deserializer deserializer;
@@ -262,5 +264,4 @@ TEST(ParseROS2, PoseStamped_JSON_Omitted)
   ASSERT_EQ(0, pose_stamped_out.pose.orientation.y);
   ASSERT_EQ(0, pose_stamped_out.pose.orientation.z);
   ASSERT_EQ(0, pose_stamped_out.pose.orientation.w);
-
 }
