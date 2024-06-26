@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(rosx_introspection  LANGUAGES C CXX VERSION 1.0.0)
+project(rosx_introspection LANGUAGES CXX VERSION 1.0.0)
 
-# Build flags
-#---- Enable C++17 ----
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(USING_ROS2 "Use ROS2" "auto")
+option(EXTERNAL_FASTCDR "Use external FastCDR" OFF)
+option(CMAKE_POSITION_INDEPENDENT_CODE "Set -fPIC" ON)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-find_package(ament_cmake QUIET)
-
+if(USE_ROS2 STREQUAL "auto")
+    find_package(ament_cmake QUIET)
+elif(USE_ROS2)
+    find_package(ament_cmake REQUIRED)
+endif()
 if (ament_cmake_FOUND)
-    set(USING_ROS2 TRUE)
+    set(USING_ROS2 TRUE CACHE BOOL "Use ROS2" FORCE)
     find_package(rosbag2_cpp REQUIRED)
     find_package(ament_index_cpp REQUIRED)
     find_package(rclcpp REQUIRED)
@@ -25,21 +25,10 @@ endif()
 
 find_package(RapidJSON REQUIRED)
 
-if(NOT USING_ROS2 )
-    message(STATUS "[FastCdr] not found, create static libraries")
-    # Override Fast-CDR option: compile as static lib
-    SET(BUILD_SHARED_LIBS OFF CACHE BOOL "Create static libraries by default")
-    add_subdirectory(3rdparty/Fast-CDR)
-    include_directories(3rdparty/Fast-CDR/include)
-else()
-    # Mention that FastCdr has been found on system
-    message(STATUS "[FastCdr] found, version: ${fastcdr_VERSION}")
-endif()
-
 ###############################################
 ## Declare a C++ library
 ###############################################
-add_library(rosx_introspection STATIC
+add_library(rosx_introspection
     ${SRC_FILES}
     src/ros_type.cpp
     src/ros_field.cpp
@@ -50,6 +39,8 @@ add_library(rosx_introspection STATIC
     src/serializer.cpp
     ${EXTRA_SRC}
     )
+target_link_libraries(rosx_introspection PRIVATE rapidjson)
+target_compile_features(rosx_introspection PUBLIC cxx_std_17)
 
 if(USING_ROS2)
     ament_target_dependencies(rosx_introspection
@@ -57,7 +48,16 @@ if(USING_ROS2)
         rclcpp
         rosbag2_cpp
         fastcdr)
+elseif(EXTERNAL_FASTCDR)
+    find_package(fastcdr REQUIRED)
+    message(STATUS "[FastCdr] found, version: ${fastcdr_VERSION}")
+else()
+    message(STATUS "[FastCdr] not found, create static libraries")
+    # Override Fast-CDR option: compile as static lib
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Create static libraries by default")
+    add_subdirectory(3rdparty/Fast-CDR)
 endif()
+target_link_libraries(rosx_introspection PRIVATE fastcdr)
 
 target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -87,21 +87,21 @@ if(USING_ROS2)
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     endif()
 
-    install(
-        DIRECTORY include/
-        DESTINATION include
-        )
-
-    install(TARGETS rosx_introspection
-        EXPORT rosx_introspectionTargets
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin
-        INCLUDES DESTINATION include
-        )
-
     ament_export_targets(rosx_introspectionTargets HAS_LIBRARY_TARGET)
     ament_export_dependencies(ament_index_cpp rosbag2_cpp fastcdr)
     ament_package()
 
 endif()
+
+include(GNUInstallDirs)
+install(
+    DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(TARGETS rosx_introspection
+    EXPORT rosx_introspectionTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
