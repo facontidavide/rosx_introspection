@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(rosx_introspection LANGUAGES CXX VERSION 1.0.0)
+project(rosx_introspection LANGUAGES CXX VERSION 1.0.1)
 
 
 option(CMAKE_POSITION_INDEPENDENT_CODE "Set -fPIC" ON)
