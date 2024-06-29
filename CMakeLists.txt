@@ -2,17 +2,15 @@ cmake_minimum_required(VERSION 3.10)
 
 project(rosx_introspection LANGUAGES CXX VERSION 1.0.0)
 
-option(USING_ROS2 "Use ROS2" "auto")
-option(EXTERNAL_FASTCDR "Use external FastCDR" OFF)
+
 option(CMAKE_POSITION_INDEPENDENT_CODE "Set -fPIC" ON)
 
-if(USE_ROS2 STREQUAL "auto")
-    find_package(ament_cmake QUIET)
-elif(USE_ROS2)
-    find_package(ament_cmake REQUIRED)
-endif()
+include(cmake/CPM.cmake)
+
+find_package(ament_cmake QUIET)
+
 if (ament_cmake_FOUND)
-    set(USING_ROS2 TRUE CACHE BOOL "Use ROS2" FORCE)
+    set(USING_ROS2 TRUE)
     find_package(rosbag2_cpp REQUIRED)
     find_package(ament_index_cpp REQUIRED)
     find_package(rclcpp REQUIRED)
@@ -23,7 +21,6 @@ if (ament_cmake_FOUND)
        src/ros_utils/ros2_helpers.cpp)
 endif()
 
-find_package(RapidJSON REQUIRED)
 
 ###############################################
 ## Declare a C++ library
@@ -39,7 +36,10 @@ add_library(rosx_introspection
     src/serializer.cpp
     ${EXTRA_SRC}
     )
-target_link_libraries(rosx_introspection PRIVATE rapidjson)
+
+target_include_directories(rosx_introspection PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
 target_compile_features(rosx_introspection PUBLIC cxx_std_17)
 
 if(USING_ROS2)
@@ -48,20 +48,30 @@ if(USING_ROS2)
         rclcpp
         rosbag2_cpp
         fastcdr)
-elseif(EXTERNAL_FASTCDR)
-    find_package(fastcdr REQUIRED)
-    message(STATUS "[FastCdr] found, version: ${fastcdr_VERSION}")
 else()
-    message(STATUS "[FastCdr] not found, create static libraries")
+    message(STATUS "Downloading FastCDR with CPM and building as static library")
     # Override Fast-CDR option: compile as static lib
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Create static libraries by default")
-    add_subdirectory(3rdparty/Fast-CDR)
-endif()
-target_link_libraries(rosx_introspection PRIVATE fastcdr)
+    # set(BUILD_SHARED_LIBS OFF CACHE BOOL "Create static libraries by default")
 
-target_include_directories(rosx_introspection PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    )
+    CPMAddPackage(NAME fastcdr
+                  GIT_TAG v2.2.2
+                  GITHUB_REPOSITORY "eProsima/Fast-CDR"
+                  OPTIONS "BUILD_SHARED_LIBS OFF")
+    target_link_libraries(rosx_introspection fastcdr)
+endif()
+
+
+find_package(RapidJSON QUIET)
+
+if(NOT RapidJSON_FOUND)
+    message(STATUS "Downloading RapidJSON with CPM")    
+    CPMAddPackage(NAME rapidjson
+        GIT_TAG v1.1.0
+        GITHUB_REPOSITORY "Tencent/rapidjson"
+        OPTIONS "RAPIDJSON_BUILD_EXAMPLES OFF" "RAPIDJSON_BUILD_TESTS OFF" "RAPIDJSON_BUILD_DOC OFF")
+endif()
+
+target_link_libraries(rosx_introspection rapidjson)
 
 
 ###############################################
