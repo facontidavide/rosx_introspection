@@ -2,8 +2,8 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.1 (2024-06-29)
+------------------
 * use CPM to download dependenies
 * Merge pull request `#9 <https://github.com/facontidavide/rosx_introspection/issues/9>`_ from valgur/feature/cmake-improvements
 * Contributors: Davide Faconti, Martin Valgur
