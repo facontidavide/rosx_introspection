@@ -71,8 +71,6 @@ if(NOT RapidJSON_FOUND)
         OPTIONS "RAPIDJSON_BUILD_EXAMPLES OFF" "RAPIDJSON_BUILD_TESTS OFF" "RAPIDJSON_BUILD_DOC OFF")
 endif()
 
-target_link_libraries(rosx_introspection rapidjson)
-
 
 ###############################################
 ## Install and Tests
