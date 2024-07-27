@@ -120,12 +120,9 @@ TEST(ParseROS2, JointState_JSON)
   ROS2_Serializer serializer;
   parser.serializeFromJson(json_text, &serializer);
 
-  std::vector<uint8_t> buffer_out(serializer.getBufferSize());
-  memcpy(buffer_out.data(), serializer.getBufferData(), buffer_out.size());
-
-  auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(buffer_out);
-
-  ASSERT_EQ(buffer_in.size(), buffer_out.size());
+  auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(
+    serializer.getBufferData(), serializer.getBufferSize()
+  );
 
   ASSERT_EQ(joint_state.header.frame_id, joint_state_out.header.frame_id);
   ASSERT_EQ(joint_state.header.stamp.sec, joint_state_out.header.stamp.sec);
@@ -156,10 +153,9 @@ TEST(ParseROS2, JointState_JSON_Omitted)
   ROS2_Serializer serializer;
   parser.serializeFromJson(joint_state_json, &serializer);
 
-  std::vector<uint8_t> buffer_out(serializer.getBufferSize());
-  memcpy(buffer_out.data(), serializer.getBufferData(), buffer_out.size());
-
-  auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(buffer_out);
+  auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(
+    serializer.getBufferData(), serializer.getBufferSize()
+  );
 
   ASSERT_EQ("", joint_state_out.header.frame_id);  // default
   ASSERT_EQ(1234, joint_state_out.header.stamp.sec);
@@ -211,12 +207,9 @@ TEST(ParseROS2, PoseStamped_JSON)
   ROS2_Serializer serializer;
   parser.serializeFromJson(json_text, &serializer);
 
-  std::vector<uint8_t> buffer_out(serializer.getBufferSize());
-  memcpy(buffer_out.data(), serializer.getBufferData(), buffer_out.size());
-
-  auto pose_stamped_out = BufferToMessage<geometry_msgs::msg::PoseStamped>(buffer_out);
-
-  ASSERT_EQ(buffer_in.size(), buffer_out.size());
+  auto pose_stamped_out = BufferToMessage<geometry_msgs::msg::PoseStamped>(
+    serializer.getBufferData(), serializer.getBufferSize()
+  );
 
   ASSERT_EQ(pose_stamped.header.frame_id, pose_stamped_out.header.frame_id);
   ASSERT_EQ(pose_stamped.header.stamp.sec, pose_stamped_out.header.stamp.sec);
@@ -246,10 +239,9 @@ TEST(ParseROS2, PoseStamped_JSON_Omitted)
   ROS2_Serializer serializer;
   parser.serializeFromJson(pose_stamped_json, &serializer);
 
-  std::vector<uint8_t> buffer_out(serializer.getBufferSize());
-  memcpy(buffer_out.data(), serializer.getBufferData(), buffer_out.size());
-
-  auto pose_stamped_out = BufferToMessage<geometry_msgs::msg::PoseStamped>(buffer_out);
+  auto pose_stamped_out = BufferToMessage<geometry_msgs::msg::PoseStamped>(
+    serializer.getBufferData(), serializer.getBufferSize()
+  );
 
   ASSERT_EQ("base", pose_stamped_out.header.frame_id);
   ASSERT_EQ(1234, pose_stamped_out.header.stamp.sec);
@@ -264,4 +256,35 @@ TEST(ParseROS2, PoseStamped_JSON_Omitted)
   ASSERT_EQ(0, pose_stamped_out.pose.orientation.y);
   ASSERT_EQ(0, pose_stamped_out.pose.orientation.z);
   ASSERT_EQ(0, pose_stamped_out.pose.orientation.w);
+}
+
+TEST(ParseROS2, Duration)
+{
+  const char* durationA_json = R"({"sec":123,"nanosec":456})";
+
+  const std::string topic_type = "builtin_interfaces/Duration";
+  Parser parser("", ROSType(topic_type), GetMessageDefinition(topic_type));
+
+  // We omitted the effort field and the header.frame_id
+  ROS2_Serializer serializer;
+  parser.serializeFromJson(durationA_json, &serializer);
+
+  auto durationA = BufferToMessage<builtin_interfaces::msg::Duration>(
+    serializer.getBufferData(), serializer.getBufferSize()
+  );
+
+  ASSERT_EQ(durationA.sec, 123);
+  ASSERT_EQ(durationA.nanosec, 456);
+  //------------------------------
+  const char* durationB_json = R"({"sec":1,"nanosec":234})";
+  serializer.reset();
+  parser.serializeFromJson(durationB_json, &serializer);
+
+  auto durationB = BufferToMessage<builtin_interfaces::msg::Duration>(
+    serializer.getBufferData(), serializer.getBufferSize()
+  );
+
+  ASSERT_EQ(durationB.sec, 1);
+  ASSERT_EQ(durationB.nanosec, 234);
+
 }

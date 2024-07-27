@@ -72,7 +72,7 @@ inline std::vector<uint8_t> BuildMessageBuffer(const T& msg,
 }
 
 template <typename T>
-inline T BufferToMessage(const std::vector<uint8_t>& buffer)
+inline T BufferToMessage(const void* bufferPtr, size_t bufferSize)
 {
   // get the type name of the ROS message with traits
   const std::string topic_type = rosidl_generator_traits::name<T>();
@@ -82,13 +82,19 @@ inline T BufferToMessage(const std::vector<uint8_t>& buffer)
       rosbag2_cpp::get_typesupport_handle(topic_type, ts_identifier, ts_library);
 
   rmw_serialized_message_t serialized_msg;
-  serialized_msg.buffer_capacity = buffer.size();
-  serialized_msg.buffer_length = buffer.size();
-  serialized_msg.buffer = const_cast<uint8_t*>(buffer.data());
+  serialized_msg.buffer_capacity = bufferSize;
+  serialized_msg.buffer_length = bufferSize;
+  serialized_msg.buffer = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(bufferPtr));
 
   T message;
   auto res = rmw_deserialize(&serialized_msg, type_support, &message);
   return message;
+}
+
+template <typename T>
+inline T BufferToMessage(const std::vector<uint8_t>& buffer)
+{
+  return BufferToMessage<T>(buffer.data(), buffer.size());
 }
 
 }  // namespace RosMsgParser
