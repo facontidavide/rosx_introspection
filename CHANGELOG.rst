@@ -2,8 +2,8 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.2 (2024-07-28)
+------------------
 * bug fix
 * add unit tests
 * Contributors: Davide Faconti
