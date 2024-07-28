@@ -444,8 +444,7 @@ bool Parser::serializeFromJson(const std::string_view json_string,
                                Serializer* serializer) const
 {
   rapidjson::Document json_document;
-  json_document.Parse(json_string.data());
-
+  json_document.Parse(json_string.data(), json_string.size());
   serializer->writeHeader();
 
   std::function<void(const ROSMessage*, rapidjson::Value*)> serializeImpl;
