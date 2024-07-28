@@ -2,6 +2,12 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* bug fix
+* add unit tests
+* Contributors: Davide Faconti
+
 1.0.1 (2024-06-29)
 ------------------
 * use CPM to download dependenies
