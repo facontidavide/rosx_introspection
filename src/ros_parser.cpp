@@ -581,8 +581,7 @@ bool Parser::serializeFromJson(const std::string_view json_string,
             }
             else
             {
-              rapidjson::Value next_value = value_field->GetObject();
-              serializeImpl(msg_node_child.get(), &next_value);
+              serializeImpl(msg_node_child.get(), value_field);
             }
           }
           break;
@@ -600,7 +599,7 @@ bool Parser::serializeFromJson(const std::string_view json_string,
   auto root_msg =
       _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 
-  rapidjson::Value json_root = json_document.GetObject();
+  rapidjson::Value& json_root = json_document;
   serializeImpl(root_msg.get(), &json_root);
 
   return true;
