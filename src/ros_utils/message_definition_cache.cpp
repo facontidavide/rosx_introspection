@@ -19,6 +19,7 @@
 #include <ament_index_cpp/get_resources.hpp>
 
 #include <fstream>
+#include <functional>
 #include <regex>
 #include <set>
 #include <string>
