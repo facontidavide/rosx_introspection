@@ -443,7 +443,7 @@ bool Parser::serializeFromJson(const std::string_view json_string,
 {
   rapidjson::Document json_document;
   json_document.Parse(json_string.data(), json_string.size());
-  serializer->writeHeader();
+  serializer->reset();
 
   std::function<void(const ROSMessage*, rapidjson::Value*)> serializeImpl;
 

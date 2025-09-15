@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <std_msgs/msg/header.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
@@ -8,12 +10,22 @@
 
 using namespace RosMsgParser;
 
+void print_vector(const char* name, const std::vector<uint8_t>& data)
+{
+  printf("%s (%d): ", name, (int)data.size());
+  for (size_t i = 0; i < data.size(); i++)
+  {
+    printf("%02X ", data[i]);
+  }
+  printf("\n");
+};
+
 sensor_msgs::msg::JointState BuildSampleJointState()
 {
   sensor_msgs::msg::JointState joint_state;
 
   joint_state.header.stamp.sec = 1234;
-  joint_state.header.stamp.nanosec = 567 * 1000 * 1000;
+  joint_state.header.stamp.nanosec = 567;
   joint_state.header.frame_id = "base";
 
   joint_state.name.resize(3);
@@ -45,6 +57,7 @@ TEST(ParseROS2, JointState)
   auto joint_state = BuildSampleJointState();
 
   std::vector<uint8_t> buffer = BuildMessageBuffer(joint_state, topic_type);
+  print_vector("JointState", buffer);
 
   auto flat_container = parser.deserialize("joint_state", Span<uint8_t>(buffer));
 
@@ -100,6 +113,51 @@ TEST(ParseROS2, JointState)
   ASSERT_EQ(flat_container->name[3].second, ("bye"));
 }
 
+std::vector<uint8_t> EncodeJointState(const sensor_msgs::msg::JointState& joint_state)
+{
+  NanoCDR_Serializer encoder;
+  encoder.serialize(BuiltinType::INT32, joint_state.header.stamp.sec);
+  encoder.serialize(BuiltinType::UINT32, joint_state.header.stamp.nanosec);
+  encoder.serializeString(joint_state.header.frame_id);
+
+  encoder.serializeUInt32(joint_state.name.size());
+  for (const auto& it : joint_state.name)
+  {
+    encoder.serializeString(it);
+  }
+  encoder.serializeUInt32(joint_state.position.size());
+  for (const auto& it : joint_state.position)
+  {
+    encoder.serialize(BuiltinType::FLOAT64, it);
+  }
+  encoder.serializeUInt32(joint_state.velocity.size());
+  for (const auto& it : joint_state.velocity)
+  {
+    encoder.serialize(BuiltinType::FLOAT64, it);
+  }
+  encoder.serializeUInt32(joint_state.effort.size());
+  for (const auto& it : joint_state.effort)
+  {
+    encoder.serialize(BuiltinType::FLOAT64, it);
+  }
+  return std::vector<uint8_t>(encoder.getBufferData(),
+                              encoder.getBufferData() + encoder.getBufferSize());
+}
+
+void CheckEncoding(const sensor_msgs::msg::JointState& joint_state)
+{
+  const std::string topic_type = "sensor_msgs/JointState";
+  std::vector<uint8_t> ref_buffer = BuildMessageBuffer(joint_state, topic_type);
+
+  auto encoded_buffer = EncodeJointState(joint_state);
+
+  print_vector("Reference", ref_buffer);
+  print_vector("Encoded  ", encoded_buffer);
+
+  // Compare the serialized buffer with the reference buffer
+  ASSERT_EQ(encoded_buffer.size(), ref_buffer.size());
+}
+
 TEST(ParseROS2, JointState_JSON)
 {
   const std::string topic_type = "sensor_msgs/JointState";
@@ -121,8 +179,7 @@ TEST(ParseROS2, JointState_JSON)
   parser.serializeFromJson(json_text, &serializer);
 
   auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(
-    serializer.getBufferData(), serializer.getBufferSize()
-  );
+      serializer.getBufferData(), serializer.getBufferSize());
 
   ASSERT_EQ(joint_state.header.frame_id, joint_state_out.header.frame_id);
   ASSERT_EQ(joint_state.header.stamp.sec, joint_state_out.header.stamp.sec);
@@ -154,8 +211,7 @@ TEST(ParseROS2, JointState_JSON_Omitted)
   parser.serializeFromJson(joint_state_json, &serializer);
 
   auto joint_state_out = BufferToMessage<sensor_msgs::msg::JointState>(
-    serializer.getBufferData(), serializer.getBufferSize()
-  );
+      serializer.getBufferData(), serializer.getBufferSize());
 
   ASSERT_EQ("", joint_state_out.header.frame_id);  // default
   ASSERT_EQ(1234, joint_state_out.header.stamp.sec);
@@ -208,8 +264,7 @@ TEST(ParseROS2, PoseStamped_JSON)
   parser.serializeFromJson(json_text, &serializer);
 
   auto pose_stamped_out = BufferToMessage<geometry_msgs::msg::PoseStamped>(
-    serializer.getBufferData(), serializer.getBufferSize()
-  );
+      serializer.getBufferData(), serializer.getBufferSize());
 
   ASSERT_EQ(pose_stamped.header.frame_id, pose_stamped_out.header.frame_id);
   ASSERT_EQ(pose_stamped.header.stamp.sec, pose_stamped_out.header.stamp.sec);
@@ -240,8 +295,7 @@ TEST(ParseROS2, PoseStamped_JSON_Omitted)
   parser.serializeFromJson(pose_stamped_json, &serializer);
 
   auto pose_stamped_out = BufferToMessage<geometry_msgs::msg::PoseStamped>(
-    serializer.getBufferData(), serializer.getBufferSize()
-  );
+      serializer.getBufferData(), serializer.getBufferSize());
 
   ASSERT_EQ("base", pose_stamped_out.header.frame_id);
   ASSERT_EQ(1234, pose_stamped_out.header.stamp.sec);
@@ -270,8 +324,7 @@ TEST(ParseROS2, Duration)
   parser.serializeFromJson(durationA_json, &serializer);
 
   auto durationA = BufferToMessage<builtin_interfaces::msg::Duration>(
-    serializer.getBufferData(), serializer.getBufferSize()
-  );
+      serializer.getBufferData(), serializer.getBufferSize());
 
   ASSERT_EQ(durationA.sec, 123);
   ASSERT_EQ(durationA.nanosec, 456);
@@ -281,10 +334,8 @@ TEST(ParseROS2, Duration)
   parser.serializeFromJson(durationB_json, &serializer);
 
   auto durationB = BufferToMessage<builtin_interfaces::msg::Duration>(
-    serializer.getBufferData(), serializer.getBufferSize()
-  );
+      serializer.getBufferData(), serializer.getBufferSize());
 
   ASSERT_EQ(durationB.sec, 1);
   ASSERT_EQ(durationB.nanosec, 234);
-
 }

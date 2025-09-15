@@ -18,7 +18,6 @@
   <depend condition="$ROS_VERSION == 2">ament_index_cpp</depend>
   <depend condition="$ROS_VERSION == 2">rclcpp</depend>
   <depend condition="$ROS_VERSION == 2">rosbag2_cpp</depend>
-  <depend condition="$ROS_VERSION == 2">fastcdr</depend>
 
   <depend>rapidjson-dev</depend>
 

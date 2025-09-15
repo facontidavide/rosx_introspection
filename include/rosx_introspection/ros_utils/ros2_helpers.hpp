@@ -66,7 +66,7 @@ inline std::vector<uint8_t> BuildMessageBuffer(const T& msg,
 
   RmwInterface rmw;
   auto serialized_msg = rmw.serialize_message(msg, typesupport);
-  std::vector<uint8_t> buffer(serialized_msg->buffer_length);
+  std::vector<uint8_t> buffer(serialized_msg->buffer_length, 0);
   memcpy(buffer.data(), serialized_msg->buffer, serialized_msg->buffer_length);
   return buffer;
 }
@@ -84,7 +84,8 @@ inline T BufferToMessage(const void* bufferPtr, size_t bufferSize)
   rmw_serialized_message_t serialized_msg;
   serialized_msg.buffer_capacity = bufferSize;
   serialized_msg.buffer_length = bufferSize;
-  serialized_msg.buffer = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(bufferPtr));
+  serialized_msg.buffer =
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(bufferPtr));
 
   T message;
   auto res = rmw_deserialize(&serialized_msg, type_support, &message);

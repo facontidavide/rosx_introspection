@@ -7,11 +7,10 @@
 #include "rosx_introspection/builtin_types.hpp"
 #include "rosx_introspection/variant.hpp"
 
-namespace eprosima::fastcdr
+namespace nanocdr
 {
-class FastBuffer;
-class Cdr;
-}  // namespace eprosima::fastcdr
+class Encoder;
+}  // namespace nanocdr
 
 namespace RosMsgParser
 {
@@ -34,8 +33,6 @@ public:
   virtual const char* getBufferData() const = 0;
 
   virtual size_t getBufferSize() const = 0;
-
-  virtual void writeHeader() = 0;
 };
 
 //-----------------------------------------------------------------
@@ -84,10 +81,10 @@ protected:
 
 // Specialization od deserializer that works with ROS2
 // wrapping FastCDR
-class FastCDR_Serializer : public Serializer
+class NanoCDR_Serializer : public Serializer
 {
 public:
-  FastCDR_Serializer();
+  NanoCDR_Serializer();
 
   bool isROS2() const override
   {
@@ -106,13 +103,11 @@ public:
 
   size_t getBufferSize() const override;
 
-  void writeHeader() override;
-
 protected:
-  std::shared_ptr<eprosima::fastcdr::FastBuffer> _cdr_buffer;
-  std::shared_ptr<eprosima::fastcdr::Cdr> _cdr;
+  std::vector<uint8_t> _storage;
+  std::shared_ptr<nanocdr::Encoder> _cdr_encoder;
 };
 
-using ROS2_Serializer = FastCDR_Serializer;
+using ROS2_Serializer = NanoCDR_Serializer;
 
 }  // namespace RosMsgParser

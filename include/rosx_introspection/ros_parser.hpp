@@ -113,7 +113,7 @@ public:
   }
 
   /**
-   * @brief getSchema provides some metadata amout a registered ROSMessage.
+   * @brief getSchema provides some metadata amount a registered ROSMessage.
    */
   const std::shared_ptr<MessageSchema>& getSchema() const;
 
@@ -162,7 +162,7 @@ public:
    *
    * @param msg_identifier    String ID to identify the registered message (use
    * registerMessageDefinition first).
-   * @param monitored_type    ROSType that triggers the invokation to the callback
+   * @param monitored_type    ROSType that triggers the invocation to the callback
    * @param buffer            Original buffer, passed as mutable since it might be
    * modified.
    * @param callback          The callback.
