@@ -8,7 +8,7 @@ from collections import defaultdict
 import argparse
 from typing import Iterable
 
-def parse_mcap_file(mcap_file: str, topics_filter: Iterable[str] = None):
+def parse_mcap_file(mcap_file: str, topics_filter: Iterable[str] = None, topic_name_as_prefix: bool = True):
     """Parse an MCAP file and return DataFrames for each topic"""
 
     with open(mcap_file, "rb") as f:
@@ -17,68 +17,63 @@ def parse_mcap_file(mcap_file: str, topics_filter: Iterable[str] = None):
 
         # we need to create one RosParser for each channel/topic
         parser_by_channel_id = {}
-
         # Storage for DataFrames - one per topic
         topic_dataframes = defaultdict(list)
-        message_counts = defaultdict(int)
 
         # read all the messages inside the mcap file
         for schema, channel, message in mcap_reader.iter_messages(topics=topics_filter):
-            parser = None
+
             # if not parsed already, try to parse the schema
             if channel.id not in parser_by_channel_id:
                 schema_data_str = schema.data.decode("utf-8")
+                prefix = channel.topic if topic_name_as_prefix else ""
                 try:
-                    prefix = channel.topic
-                    parser = rosx_introspection.Parser(
+                    parser_by_channel_id[channel.id] = rosx_introspection.Parser(
                         topic_name=prefix,
                         type_name=schema.name,
                         schema=schema_data_str
-                    )
-                    # save this parser to use it later
-                    parser_by_channel_id[channel.id] = parser
-                    
+                    ) 
                 except Exception as e:
                     print(f"Failed to parse schema ID {schema.id}: {e}")
                     raise Exception("Failed to create parser")
 
             # get the parser for this channel
             parser = parser_by_channel_id.get(channel.id)
-            if parser:
-                try:
-                    # Parse the message data to msgpack
-                    msgpack_bytes = parser.parse_to_msgpack(message.data)
-                    # this is the most efficient way to read msgpack without creating a full dictionary
-                    unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
-                    # do not create a dictionary, but lets read manually instead
-                    flatmap_size = unpacker.read_map_header()
 
-                    # Create row data with timestamp
-                    row_data = {
-                            '_log_timestamp': message.log_time
-                    }
-                    # add each key/value pair in the map to the row_data
-                    for _i in range(flatmap_size):
-                        key = unpacker.unpack()
-                        value = unpacker.unpack()
-                        row_data[key] = value
+            try:
+                # Parse the message data to msgpack
+                msgpack_bytes = parser.parse_to_msgpack(message.data)
+                # Create row data with timestamp
+                row_data = { '_log_timestamp': message.log_time }
 
-                    # Add to topic's data list
-                    topic_dataframes[channel.topic].append(row_data)
-                    message_counts[channel.topic] += 1
+                # this is the most efficient way to read msgpack without creating a full dictionary
+                # do not create a dictionary, but lets read manually instead
+                unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
+                flatmap_size = unpacker.read_map_header()
+                
+                # add each key/value pair in the map to the row_data
+                for _i in range(flatmap_size):
+                    key = unpacker.unpack()
+                    value = unpacker.unpack()
+                    row_data[key] = value
 
-                except Exception as e:
-                    print(f"Failed to parse message on channel {channel.topic}: {e}")
+                # Add to topic's data list
+                topic_dataframes[channel.topic].append(row_data)
+
+            except Exception as e:
+                print(f"Failed to parse message on channel {channel.topic}: {e}")
 
         # Convert lists to DataFrames
         final_dataframes = {}
         for topic, data_list in topic_dataframes.items():
             if data_list:  # Only create DataFrame if we have data
-                df = pd.DataFrame(data_list)
-                # Set log_time as index
-                df.set_index('_log_timestamp', inplace=True)
-                # Sort by timestamp
-                df.sort_index(inplace=True)
+                # Create DataFrame with index in one step (more efficient)
+                df = pd.DataFrame(data_list).set_index('_log_timestamp')
+
+                # Only sort if needed (check if already sorted)
+                if not df.index.is_monotonic_increasing:
+                    df.sort_index(inplace=True)
+
                 final_dataframes[topic] = df
         return final_dataframes
 
@@ -110,7 +105,7 @@ def main():
 
     try:
         # Parse the MCAP file
-        dataframes = parse_mcap_file(args.mcap_file)
+        dataframes = parse_mcap_file(args.mcap_file, topic_name_as_prefix=False)
         
         # Summary
         print(f"\nSUMMARY:")
