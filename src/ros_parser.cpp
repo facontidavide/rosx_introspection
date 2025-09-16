@@ -124,7 +124,8 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
       bool IS_BLOB = false;
 
       // Stop storing it if is NOT a blob and a very large array.
-      if (array_size > static_cast<int32_t>(_max_array_size))
+      if (array_size > static_cast<int32_t>(_max_array_size) &&
+          field_type.typeID() == BuiltinType::OTHER)
       {
         if (builtinSize(field_type.typeID()) == 1)
         {

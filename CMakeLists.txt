@@ -6,6 +6,7 @@ project(rosx_introspection LANGUAGES CXX VERSION 1.0.2)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CMAKE_POSITION_INDEPENDENT_CODE "Set -fPIC" ON)
+option(BUILD_PYTHON_BINDINGS "Build Python bindings using nanobind" OFF)
 
 include(cmake/CPM.cmake)
 
@@ -113,3 +114,8 @@ install(TARGETS rosx_introspection
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+
+# Python bindings
+if(BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
