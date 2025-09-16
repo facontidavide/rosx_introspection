@@ -6,14 +6,12 @@ find_package(Python 3.8
   REQUIRED COMPONENTS Interpreter Development.Module
   OPTIONAL_COMPONENTS Development.SABIModule)
 
-# Fetch nanobind
-include(FetchContent)
-FetchContent_Declare(
-  nanobind
-  GIT_REPOSITORY https://github.com/wjakob/nanobind
-  GIT_TAG        v2.2.0  # Use the latest stable version
+# Fetch nanobind via CPM
+CPMAddPackage(
+  NAME            nanobind
+  GITHUB_REPOSITORY wjakob/nanobind
+  GIT_TAG         v2.9.2
 )
-FetchContent_MakeAvailable(nanobind)
 
 # Create the Python module
 nanobind_add_module(
