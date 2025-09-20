@@ -18,60 +18,63 @@ def parse_generic_msgpack(msgpack_bytes) -> dict[str, any]:
     # add each key/value pair in the map to the result
     for _i in range(flatmap_size):
         key = unpacker.unpack()
+        value = unpacker.unpack()
         if key.startswith("/"):
             key = key[1:]  # remove leading slash
-        value = unpacker.unpack()
         result[key] = value
     return result
 
-# Example: given key="joint/3/position" and pattern="joint/#/position", return 3
-def get_array_index(key: str, pattern: str) -> int:
-    # position of character '#' in the pattern
-    pos = pattern.find('#')
-    suffix = pattern[pos+1:]
-    if not key.endswith(suffix):
-        return -1
-    prefix = pattern[:pos]
-    if not key.startswith(prefix):
-        return -1
-    
-    middle = key[len(prefix):len(key)-len(suffix)]
-    if middle.isdigit():
-        return int(middle)
-    return -1
+class PatternChecker:
+    def __init__(self, pattern: str):
+        self.pattern = pattern
+        parts = pattern.split('#')
+        self.prefix = parts[0]
+        self.suffix = parts[-1]
 
-def parse_capstan_RobotJointCommand(msgpack_bytes) -> dict[str, any]:
+    def match(self, key: str) -> bool:
+        return key.startswith(self.prefix) and key.endswith(self.suffix)
+
+
+def parse_RobotJointCommand(msgpack_bytes) -> dict[str, any]:
     result = {}
     names = []
     enables = []
     positions = []
+    
+    check_name = PatternChecker("name[#]")
+    check_enable = PatternChecker("enable[#]")
+    check_position = PatternChecker("position[#]")
 
     unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
     flatmap_size = unpacker.read_map_header()
+
     # add each key/value pair in the map to the result
     for _i in range(flatmap_size):
         key = unpacker.unpack()
+        value = unpacker.unpack()
         if key.startswith("/"):
             key = key[1:]  # remove leading slash
-        value = unpacker.unpack()
 
-        if (idx := get_array_index(key, "name[#]")) != -1: names.append(value); continue
-        if (idx := get_array_index(key, "position[#]")) != -1: positions.append(value); continue
-        if (idx := get_array_index(key, "enable[#]")) != -1: enables.append(value); continue
+        if check_name.match(key): names.append(value); continue
+        if check_position.match(key): positions.append(value); continue
+        if check_enable.match(key): enables.append(value); continue
         # default fallback
         result[key] = value
 
-    len_names = len(names)
-    if len_names == len(positions):
-        for i in range(len_names):
+    names_count = len(names)
+    if names_count == len(positions):
+        for i in range(names_count):
             result[f"position.{names[i]}"] = positions[i]
-    if len_names == len(enables):
-        for i in range(len_names):
+    if names_count == len(enables):
+        for i in range(names_count):
             result[f"enable.{names[i]}"] = enables[i]
+    # print("-----")      
+    # for key, value in result.items():
+    #     print(f"  {key}: {value}")
     return result
 
 
-def parse_capstan_RobotJointState(msgpack_bytes) -> dict[str, any]:
+def parse_RobotJointState(msgpack_bytes) -> dict[str, any]:
     result = {}
     names = []
     enables = []
@@ -83,51 +86,67 @@ def parse_capstan_RobotJointState(msgpack_bytes) -> dict[str, any]:
     raw_efforts = []
     position_following_errors = []
 
+    check_name = PatternChecker("name[#]")
+    check_enable = PatternChecker("enable[#]")
+    check_fault = PatternChecker("fault[#]")
+    check_warn = PatternChecker("warn[#]")
+    check_position = PatternChecker("position[#]")
+    check_velocity = PatternChecker("velocity[#]")
+    check_effort = PatternChecker("effort[#]")
+    check_raw_effort = PatternChecker("raw_effort[#]")
+    check_position_following_error = PatternChecker("position_following_error[#]")
+
+     # Helper to find array index in pattern
+
     unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
     flatmap_size = unpacker.read_map_header()
     # add each key/value pair in the map to the result
     for _i in range(flatmap_size):
         key = unpacker.unpack()
+        value = unpacker.unpack()
         if key.startswith("/"):
             key = key[1:]  # remove leading slash
-        value = unpacker.unpack()
 
-        if (idx := get_array_index(key, "name[#]")) != -1: names.append(value); continue
-        if (idx := get_array_index(key, "enable[#]")) != -1: enables.append(value); continue
-        if (idx := get_array_index(key, "fault[#]")) != -1: faults.append(value); continue
-        if (idx := get_array_index(key, "warn[#]")) != -1: warns.append(value); continue
-        if (idx := get_array_index(key, "position[#]")) != -1: positions.append(value); continue
-        if (idx := get_array_index(key, "velocity[#]")) != -1: velocities.append(value); continue
-        if (idx := get_array_index(key, "effort[#]")) != -1: efforts.append(value); continue
-        if (idx := get_array_index(key, "raw_effort[#]")) != -1: raw_efforts.append(value); continue
-        if (idx := get_array_index(key, "position_following_error[#]")) != -1: position_following_errors.append(value); continue
+        if check_name.match(key): names.append(value); continue
+        if check_enable.match(key): enables.append(value); continue
+        if check_fault.match(key): faults.append(value); continue
+        if check_warn.match(key): warns.append(value); continue
+        if check_position.match(key): positions.append(value); continue
+        if check_velocity.match(key): velocities.append(value); continue
+        if check_effort.match(key): efforts.append(value); continue
+        if check_raw_effort.match(key): raw_efforts.append(value); continue
+        if check_position_following_error.match(key): position_following_errors.append(value); continue
         # default fallback
         result[key] = value
-        
-    if len(names) == len(positions):
-        for i in range(len(names)):
-            result[f"position.{names[i]}"] = positions[i]
-    if len(names) == len(velocities):
-        for i in range(len(names)):
-            result[f"velocity.{names[i]}"] = velocities[i]
-    if len(names) == len(efforts):
-        for i in range(len(names)):
-            result[f"effort.{names[i]}"] = efforts[i]
-    if len(names) == len(raw_efforts):
-        for i in range(len(names)):
-            result[f"raw_effort.{names[i]}"] = raw_efforts[i]
-    if len(names) == len(position_following_errors):
-        for i in range(len(names)):
-            result[f"position_following_error.{names[i]}"] = position_following_errors[i]
-    if len(names) == len(enables):
-        for i in range(len(names)):
+
+    names_count = len(names)
+    if names_count == len(enables):
+        for i in range(names_count):
             result[f"enable.{names[i]}"] = enables[i]
-    if len(names) == len(faults):
-        for i in range(len(names)):
+    if names_count == len(faults):
+        for i in range(names_count):
             result[f"fault.{names[i]}"] = faults[i]
-    if len(names) == len(warns):
-        for i in range(len(names)):
+    if names_count == len(warns):
+        for i in range(names_count):
             result[f"warn.{names[i]}"] = warns[i]
+    if names_count == len(positions):
+        for i in range(names_count):
+            result[f"position.{names[i]}"] = positions[i]
+    if names_count == len(velocities):
+        for i in range(names_count):
+            result[f"velocity.{names[i]}"] = velocities[i]
+    if names_count == len(efforts):
+        for i in range(names_count):
+            result[f"effort.{names[i]}"] = efforts[i]
+    if names_count == len(raw_efforts):
+        for i in range(names_count):
+            result[f"raw_effort.{names[i]}"] = raw_efforts[i]
+    if names_count == len(position_following_errors):
+        for i in range(names_count):
+            result[f"position_following_error.{names[i]}"] = position_following_errors[i]
+    # print("-----")      
+    # for key, value in result.items():
+    #     print(f"  {key}: {value}")
     return result
 
 
@@ -171,9 +190,9 @@ def parse_mcap_file(mcap_file: str, topics_filter: Iterable[str] = None, topic_n
                 row_data = {}
 
                 if schema.name == "capstan/msg/RobotJointCommand":
-                    row_data = parse_capstan_RobotJointCommand(msgpack_bytes)
+                    row_data = parse_RobotJointCommand(msgpack_bytes)
                 if schema.name == "capstan/msg/RobotJointState":
-                    row_data = parse_capstan_RobotJointState(msgpack_bytes)
+                    row_data = parse_RobotJointState(msgpack_bytes)
                 else:
                     row_data = parse_generic_msgpack(msgpack_bytes)
 
