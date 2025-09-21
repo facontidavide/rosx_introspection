@@ -39,9 +39,6 @@ struct FlatMessage
   /// builtin value different from "string".
   std::vector<std::pair<FieldsVector, Variant>> value;
 
-  /// List of all those parsed fields that can be represented by a "string".
-  std::vector<std::pair<FieldsVector, std::string>> name;
-
   /// Store "blobs", i.e all those fields which are vectors of BYTES (AKA uint8_t),
   /// where the vector size is greater than the argument [max_array_size].
   std::vector<std::pair<FieldsVector, Span<const uint8_t>>> blob;

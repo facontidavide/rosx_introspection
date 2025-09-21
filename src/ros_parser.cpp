@@ -88,7 +88,6 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
   bool entire_message_parse = true;
 
   size_t value_index = 0;
-  size_t name_index = 0;
   size_t blob_index = 0;
   size_t blob_storage_index = 0;
 
@@ -191,16 +190,16 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
 
           if (field_type.typeID() == STRING)
           {
-            ExpandVectorIfNecessary(flat_container->name, name_index);
+            ExpandVectorIfNecessary(flat_container->value, value_index);
 
             std::string str;
             deserializer->deserializeString(str);
 
             if (DO_STORE_ARRAY)
             {
-              flat_container->name[name_index].first = FieldsVector(new_tree_leaf);
-              flat_container->name[name_index].second = str;
-              name_index++;
+              flat_container->value[value_index].first = FieldsVector(new_tree_leaf);
+              flat_container->value[value_index].second = str;
+              value_index++;
             }
           }
           else if (field_type.isBuiltin())
@@ -241,7 +240,6 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
 
   deserializeImpl(root_msg.get(), rootnode, true);
 
-  flat_container->name.resize(name_index);
   flat_container->value.resize(value_index);
   flat_container->blob.resize(blob_index);
   flat_container->blob_storage.resize(blob_storage_index);

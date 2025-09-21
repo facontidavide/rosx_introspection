@@ -34,6 +34,12 @@ class PatternChecker:
     def match(self, key: str) -> bool:
         return key.startswith(self.prefix) and key.endswith(self.suffix)
 
+def unpack_key_value(unpacker):
+    key = unpacker.unpack()
+    if key.startswith("/"):
+        key = key[1:]  # remove leading slash
+    value = unpacker.unpack()
+    return key, value
 
 def parse_RobotJointCommand(msgpack_bytes) -> dict[str, any]:
     result = {}
@@ -48,12 +54,11 @@ def parse_RobotJointCommand(msgpack_bytes) -> dict[str, any]:
     unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
     flatmap_size = unpacker.read_map_header()
 
+    # print("------------------")     
     # add each key/value pair in the map to the result
     for _i in range(flatmap_size):
-        key = unpacker.unpack()
-        value = unpacker.unpack()
-        if key.startswith("/"):
-            key = key[1:]  # remove leading slash
+        key, value = unpack_key_value(unpacker)
+        # print(f"  {key}: {value}")
 
         if check_name.match(key): names.append(value); continue
         if check_position.match(key): positions.append(value); continue
@@ -96,29 +101,68 @@ def parse_RobotJointState(msgpack_bytes) -> dict[str, any]:
     check_raw_effort = PatternChecker("raw_effort[#]")
     check_position_following_error = PatternChecker("position_following_error[#]")
 
-     # Helper to find array index in pattern
-
     unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
-    flatmap_size = unpacker.read_map_header()
-    # add each key/value pair in the map to the result
-    for _i in range(flatmap_size):
-        key = unpacker.unpack()
-        value = unpacker.unpack()
-        if key.startswith("/"):
-            key = key[1:]  # remove leading slash
 
-        if check_name.match(key): names.append(value); continue
-        if check_enable.match(key): enables.append(value); continue
-        if check_fault.match(key): faults.append(value); continue
-        if check_warn.match(key): warns.append(value); continue
-        if check_position.match(key): positions.append(value); continue
-        if check_velocity.match(key): velocities.append(value); continue
-        if check_effort.match(key): efforts.append(value); continue
-        if check_raw_effort.match(key): raw_efforts.append(value); continue
-        if check_position_following_error.match(key): position_following_errors.append(value); continue
-        # default fallback
+    flatmap_size = unpacker.read_map_header()
+    i = 0
+    
+    # unpack all the fields before "name[#]" 
+    while i < flatmap_size:
+        key, value = unpack_key_value(unpacker)
+        i += 1
+        if check_name.match(key):
+            break
+        result[key] = value
+    
+    # unpack all the fields between "name" and "position_following_error"
+    # this code will work ONLY if we don't change the order of the fields in the schema
+    while(check_name.match(key)):
+        names.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_enable.match(key)):
+        enables.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_fault.match(key)):
+        faults.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_warn.match(key)):
+        warns.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_position.match(key)):
+        positions.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_velocity.match(key)):
+        velocities.append(value);
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_effort.match(key)):
+        efforts.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_raw_effort.match(key)):
+        raw_efforts.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+    while(check_position_following_error.match(key)):
+        position_following_errors.append(value)
+        key, value = unpack_key_value(unpacker)
+        i += 1
+
+    # save the latest unmatched check_position_following_error
+    result[key] = value
+    
+    # unpack fields left
+    while i < flatmap_size:
+        key, value = unpack_key_value(unpacker)
+        i += 1
         result[key] = value
 
+    # use the name to create per-joint fields
     names_count = len(names)
     if names_count == len(enables):
         for i in range(names_count):

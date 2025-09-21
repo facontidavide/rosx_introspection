@@ -23,7 +23,7 @@ void convertToMsgpack(const RosMsgParser::FlatMessage& flat_msg,
     }
   };
 
-  const uint32_t num_elements = flat_msg.value.size() + flat_msg.name.size();
+  const uint32_t num_elements = flat_msg.value.size();
   uint8_t* data_ptr = msgpack_data.data();
 
   data_ptr += msgpack::pack_map(data_ptr, num_elements);
@@ -40,6 +40,8 @@ void convertToMsgpack(const RosMsgParser::FlatMessage& flat_msg,
         return msgpack::pack_float(data, number.extract<float>());
       case RosMsgParser::BuiltinType::BOOL:
         return msgpack::pack_bool(data, number.extract<bool>());
+      case RosMsgParser::BuiltinType::STRING:
+        return msgpack::pack_string(data, number.convert<std::string>());
       default:
         // fallback to int64 for all the other types
         return msgpack::pack_int(data, number.convert<int64_t>());
@@ -55,15 +57,6 @@ void convertToMsgpack(const RosMsgParser::FlatMessage& flat_msg,
     resize_if_needed(4 + key_str.size() + 9);  // max key + max value size
     data_ptr += msgpack::pack_string(data_ptr, key_str);
     data_ptr += pack_variant(num_value, data_ptr);
-  }
-
-  // Write string values as key-value pairs
-  for (const auto& [key, string_value] : flat_msg.name)
-  {
-    key.toStr(key_str);
-    resize_if_needed(8 + key_str.size() + string_value.size());
-    data_ptr += msgpack::pack_string(data_ptr, key_str);
-    data_ptr += msgpack::pack_string(data_ptr, string_value);
   }
 
   msgpack_data.resize(static_cast<int>(data_ptr - msgpack_data.data()));
