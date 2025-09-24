@@ -63,8 +63,13 @@ if(ROSX_HAS_JSON)
             OPTIONS "RAPIDJSON_BUILD_EXAMPLES OFF" "RAPIDJSON_BUILD_TESTS OFF" "RAPIDJSON_BUILD_DOC OFF")
     endif()
 
-    target_link_libraries(rosx_introspection PRIVATE rapidjson)
     target_compile_definitions(rosx_introspection PRIVATE ROSX_HAS_JSON)
+    if(USING_ROS2)
+        target_link_libraries(rosx_introspection rapidjson)
+    else()
+        target_link_libraries(rosx_introspection PUBLIC rapidjson)
+    endif()
+
 endif(ROSX_HAS_JSON)
 
 
