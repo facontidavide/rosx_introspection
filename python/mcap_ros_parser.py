@@ -32,7 +32,7 @@ def parse_mcap_file(mcap_file: str, topics_filter: Iterable[str] = None, topic_n
                         topic_name=prefix,
                         type_name=schema.name,
                         schema=schema_data_str
-                    ) 
+                    )
                 except Exception as e:
                     print(f"Failed to parse schema ID {schema.id}: {e}")
                     raise Exception("Failed to create parser")
@@ -50,7 +50,7 @@ def parse_mcap_file(mcap_file: str, topics_filter: Iterable[str] = None, topic_n
                 # do not create a dictionary, but lets read manually instead
                 unpacker = msgpack.Unpacker(io.BytesIO(msgpack_bytes), raw=False)
                 flatmap_size = unpacker.read_map_header()
-                
+
                 # add each key/value pair in the map to the row_data
                 for _i in range(flatmap_size):
                     key = unpacker.unpack()
@@ -106,7 +106,7 @@ def main():
     try:
         # Parse the MCAP file
         dataframes = parse_mcap_file(args.mcap_file, topic_name_as_prefix=False)
-        
+
         # Summary
         print(f"\nSUMMARY:")
         print(f"Total topics: {len(dataframes)}")

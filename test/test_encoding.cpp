@@ -1,13 +1,12 @@
 #include <gtest/gtest.h>
 
-#include "rosx_introspection/serializer.hpp"
 #include "rosx_introspection/deserializer.hpp"
 #include "rosx_introspection/ros_message.hpp"
+#include "rosx_introspection/serializer.hpp"
 
 using namespace RosMsgParser;
 
-TEST(NanoSerializer, RoundTrip)
-{
+TEST(NanoSerializer, RoundTrip) {
   // Create and initialize serializer
   NanoCDR_Serializer serializer;
   serializer.reset();
@@ -80,8 +79,7 @@ TEST(NanoSerializer, RoundTrip)
   EXPECT_EQ(deserializer.deserialize(INT32).convert<int32_t>(), -100000);
   EXPECT_EQ(deserializer.deserialize(UINT32).convert<uint32_t>(), 3000000000);
   EXPECT_EQ(deserializer.deserialize(INT64).convert<int64_t>(), -9223372036854775807LL);
-  EXPECT_EQ(deserializer.deserialize(UINT64).convert<uint64_t>(),
-            18446744073709551615ULL);
+  EXPECT_EQ(deserializer.deserialize(UINT64).convert<uint64_t>(), 18446744073709551615ULL);
   EXPECT_FLOAT_EQ(deserializer.deserialize(FLOAT32).convert<float>(), 3.14159f);
   EXPECT_DOUBLE_EQ(deserializer.deserialize(FLOAT64).convert<double>(), 2.718281828);
 

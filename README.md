@@ -43,4 +43,4 @@ If you have a rosbag (MCAP file) you can test it with this command
 PYTHONPATH=build_python/python python3 python/mcap_ros_parser.py path_to_your_rosbag.mcap
 ```
 
-Note that we are providing the folder where the dynamic library is using **PYTHONPATH**. 
+Note that we are providing the folder where the dynamic library is using **PYTHONPATH**.
