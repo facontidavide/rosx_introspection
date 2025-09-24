@@ -25,6 +25,7 @@
 
 #include <functional>
 
+#ifdef ROSX_HAS_JSON
 #include "rapidjson/document.h"
 #include "rapidjson/memorystream.h"
 #include "rapidjson/prettywriter.h"
@@ -32,7 +33,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 #include "rosx_introspection/deserializer.hpp"
-
+#endif
 namespace RosMsgParser {
 inline bool operator==(const std::string& a, const std::string_view& b) {
   return (a.size() == b.size() && std::strncmp(a.data(), b.data(), a.size()) == 0);
@@ -207,6 +208,19 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
   return entire_message_parse;
 }
 
+#ifndef ROSX_HAS_JSON
+bool Parser::deserializeIntoJson(
+    Span<const uint8_t> buffer, std::string* json_txt, Deserializer* deserializer, int indent,
+    bool ignore_constants) const {
+  throw std::runtime_error("This version of rosx_introspection was built without JSON support");
+  return false;
+}
+bool Parser::serializeFromJson(const std::string_view json_string, Serializer* serializer) const {
+  throw std::runtime_error("This version of rosx_introspection was built without JSON support");
+  return false;
+}
+
+#else
 bool Parser::deserializeIntoJson(
     Span<const uint8_t> buffer, std::string* json_txt, Deserializer* deserializer, int indent,
     bool ignore_constants) const {
@@ -505,5 +519,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
 
   return true;
 }
+
+#endif
 
 }  // namespace RosMsgParser

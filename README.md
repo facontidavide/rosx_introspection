@@ -33,7 +33,7 @@ The raw memory buffer is usually obtained by:
 Compilation instructions:
 
 ```
-cmake -S. -B build_python -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_BINDINGS=ON
+cmake -S. -B build_python -DCMAKE_BUILD_TYPE=Release -DROSX_PYTHON_BINDINGS=ON
 cmake --build build_python
 ```
 

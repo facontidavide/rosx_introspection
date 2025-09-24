@@ -6,7 +6,8 @@ project(rosx_introspection LANGUAGES CXX VERSION 1.0.2)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CMAKE_POSITION_INDEPENDENT_CODE "Set -fPIC" ON)
-option(BUILD_PYTHON_BINDINGS "Build Python bindings using nanobind" OFF)
+option(ROSX_PYTHON_BINDINGS "Build Python bindings using nanobind" OFF)
+option(ROSX_HAS_JSON "Add JSON converters" ON)
 
 include(cmake/CPM.cmake)
 
@@ -51,16 +52,20 @@ if(USING_ROS2)
         rosbag2_cpp)
 endif()
 
+if(ROSX_HAS_JSON)
+    find_package(RapidJSON QUIET)
 
-find_package(RapidJSON QUIET)
+    if(NOT RapidJSON_FOUND)
+        message(STATUS "Downloading RapidJSON with CPM")
+        CPMAddPackage(NAME rapidjson
+            GIT_TAG v1.1.0
+            GITHUB_REPOSITORY "Tencent/rapidjson"
+            OPTIONS "RAPIDJSON_BUILD_EXAMPLES OFF" "RAPIDJSON_BUILD_TESTS OFF" "RAPIDJSON_BUILD_DOC OFF")
+    endif()
 
-if(NOT RapidJSON_FOUND)
-    message(STATUS "Downloading RapidJSON with CPM")
-    CPMAddPackage(NAME rapidjson
-        GIT_TAG v1.1.0
-        GITHUB_REPOSITORY "Tencent/rapidjson"
-        OPTIONS "RAPIDJSON_BUILD_EXAMPLES OFF" "RAPIDJSON_BUILD_TESTS OFF" "RAPIDJSON_BUILD_DOC OFF")
-endif()
+    target_link_libraries(rosx_introspection PRIVATE rapidjson)
+    target_compile_definitions(rosx_introspection PRIVATE ROSX_HAS_JSON)
+endif(ROSX_HAS_JSON)
 
 
 ###############################################
@@ -116,6 +121,6 @@ install(TARGETS rosx_introspection
 )
 
 # Python bindings
-if(BUILD_PYTHON_BINDINGS)
+if(ROSX_PYTHON_BINDINGS)
     add_subdirectory(python)
 endif()
