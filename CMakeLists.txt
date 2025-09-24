@@ -64,10 +64,8 @@ if(ROSX_HAS_JSON)
     endif()
 
     target_compile_definitions(rosx_introspection PRIVATE ROSX_HAS_JSON)
-    if(USING_ROS2)
-        target_link_libraries(rosx_introspection rapidjson)
-    else()
-        target_link_libraries(rosx_introspection PUBLIC rapidjson)
+    if(NOT USING_ROS2)
+        target_link_libraries(rosx_introspection PRIVATE rapidjson)
     endif()
 
 endif(ROSX_HAS_JSON)

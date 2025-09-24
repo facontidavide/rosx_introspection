@@ -40,14 +40,6 @@ TEST_CASE("Parse ROS1 [JointState]") {
 
   auto flat_container = parser.deserialize("joint_state", Span<uint8_t>(buffer));
 
-  for (auto& it : flat_container->value) {
-    std::cout << it.first << " >> " << it.second.convert<double>() << std::endl;
-  }
-
-  for (auto& it : flat_container->name) {
-    std::cout << it.first << " >> " << it.second << std::endl;
-  }
-
   CHECK(flat_container->value[0].first.toStdString() == ("joint_state/header/seq"));
   CHECK(flat_container->value[0].second.convert<int>() == 2016);
 
@@ -57,36 +49,34 @@ TEST_CASE("Parse ROS1 [JointState]") {
   CHECK(time.sec == joint_state.header.stamp.sec);
   CHECK(time.nsec == joint_state.header.stamp.nsec);
 
-  CHECK(flat_container->value[2].first.toStdString() == ("joint_state/position[0]"));
-  CHECK(flat_container->value[2].second.convert<int>() == 10);
-  CHECK(flat_container->value[3].first.toStdString() == ("joint_state/position[1]"));
-  CHECK(flat_container->value[3].second.convert<int>() == 11);
-  CHECK(flat_container->value[4].first.toStdString() == ("joint_state/position[2]"));
-  CHECK(flat_container->value[4].second.convert<int>() == 12);
+  CHECK(flat_container->value[2].first.toStdString() == ("joint_state/header/frame_id"));
+  CHECK(flat_container->value[2].second.convert<std::string>() == ("pippo"));
 
-  CHECK(flat_container->value[5].first.toStdString() == ("joint_state/velocity[0]"));
-  CHECK(flat_container->value[5].second.convert<int>() == 30);
-  CHECK(flat_container->value[6].first.toStdString() == ("joint_state/velocity[1]"));
-  CHECK(flat_container->value[6].second.convert<int>() == 31);
-  CHECK(flat_container->value[7].first.toStdString() == ("joint_state/velocity[2]"));
-  CHECK(flat_container->value[7].second.convert<int>() == 32);
+  CHECK(flat_container->value[3].first.toStdString() == ("joint_state/name[0]"));
+  CHECK(flat_container->value[3].second.convert<std::string>() == ("hola"));
+  CHECK(flat_container->value[4].first.toStdString() == ("joint_state/name[1]"));
+  CHECK(flat_container->value[4].second.convert<std::string>() == ("ciao"));
+  CHECK(flat_container->value[5].first.toStdString() == ("joint_state/name[2]"));
+  CHECK(flat_container->value[5].second.convert<std::string>() == ("bye"));
 
-  CHECK(flat_container->value[8].first.toStdString() == ("joint_state/effort[0]"));
-  CHECK(flat_container->value[8].second.convert<int>() == 50);
-  CHECK(flat_container->value[9].first.toStdString() == ("joint_state/effort[1]"));
-  CHECK(flat_container->value[9].second.convert<int>() == 51);
-  CHECK(flat_container->value[10].first.toStdString() == ("joint_state/effort[2]"));
-  CHECK(flat_container->value[10].second.convert<int>() == 52);
+  CHECK(flat_container->value[6].first.toStdString() == ("joint_state/position[0]"));
+  CHECK(flat_container->value[6].second.convert<int>() == 10);
+  CHECK(flat_container->value[7].first.toStdString() == ("joint_state/position[1]"));
+  CHECK(flat_container->value[7].second.convert<int>() == 11);
+  CHECK(flat_container->value[8].first.toStdString() == ("joint_state/position[2]"));
+  CHECK(flat_container->value[8].second.convert<int>() == 12);
 
-  CHECK(flat_container->name[0].first.toStdString() == ("joint_state/header/frame_id"));
-  CHECK(flat_container->name[0].second == ("pippo"));
+  CHECK(flat_container->value[9].first.toStdString() == ("joint_state/velocity[0]"));
+  CHECK(flat_container->value[9].second.convert<int>() == 30);
+  CHECK(flat_container->value[10].first.toStdString() == ("joint_state/velocity[1]"));
+  CHECK(flat_container->value[10].second.convert<int>() == 31);
+  CHECK(flat_container->value[11].first.toStdString() == ("joint_state/velocity[2]"));
+  CHECK(flat_container->value[11].second.convert<int>() == 32);
 
-  CHECK(flat_container->name[1].first.toStdString() == ("joint_state/name[0]"));
-  CHECK(flat_container->name[1].second == ("hola"));
-
-  CHECK(flat_container->name[2].first.toStdString() == ("joint_state/name[1]"));
-  CHECK(flat_container->name[2].second == ("ciao"));
-
-  CHECK(flat_container->name[3].first.toStdString() == ("joint_state/name[2]"));
-  CHECK(flat_container->name[3].second == ("bye"));
+  CHECK(flat_container->value[12].first.toStdString() == ("joint_state/effort[0]"));
+  CHECK(flat_container->value[12].second.convert<int>() == 50);
+  CHECK(flat_container->value[13].first.toStdString() == ("joint_state/effort[1]"));
+  CHECK(flat_container->value[13].second.convert<int>() == 51);
+  CHECK(flat_container->value[14].first.toStdString() == ("joint_state/effort[2]"));
+  CHECK(flat_container->value[14].second.convert<int>() == 52);
 }

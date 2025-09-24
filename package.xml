@@ -2,7 +2,7 @@
 <package format="3">
   <name>rosx_introspection</name>
   <version>2.0.0</version>
-  <description>Successor of ros_type_introspection</description>
+  <description>Parse any ROS/ROS2 message without compile-time information</description>
 
   <maintainer email="davide.faconti@gmail.com">Davide Faconti</maintainer>
   <license>MIT</license>

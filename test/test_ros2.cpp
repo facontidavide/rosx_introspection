@@ -55,54 +55,41 @@ TEST(ParseROS2, JointState) {
 
   auto flat_container = parser.deserialize("joint_state", Span<uint8_t>(buffer));
 
-  for (auto& it : flat_container->value) {
-    std::cout << it.first << " >> " << it.second.convert<double>() << std::endl;
-  }
-
-  for (auto& it : flat_container->name) {
-    std::cout << it.first << " >> " << it.second << std::endl;
-  }
-
   ASSERT_EQ(flat_container->value[0].first.toStdString(), "joint_state/header/stamp/sec");
   ASSERT_EQ(flat_container->value[0].second.convert<uint32_t>(), joint_state.header.stamp.sec);
-  ASSERT_EQ(
-      flat_container->value[1].first.toStdString(),
-      "joint_state/header/stamp/"
-      "nanosec");
+  ASSERT_EQ(flat_container->value[1].first.toStdString(), "joint_state/header/stamp/nanosec");
   ASSERT_EQ(flat_container->value[1].second.convert<uint32_t>(), joint_state.header.stamp.nanosec);
 
-  ASSERT_EQ(flat_container->value[2].first.toStdString(), ("joint_state/position[0]"));
-  ASSERT_EQ(flat_container->value[2].second.convert<int>(), 10);
-  ASSERT_EQ(flat_container->value[3].first.toStdString(), ("joint_state/position[1]"));
-  ASSERT_EQ(flat_container->value[3].second.convert<int>(), 11);
-  ASSERT_EQ(flat_container->value[4].first.toStdString(), ("joint_state/position[2]"));
-  ASSERT_EQ(flat_container->value[4].second.convert<int>(), 12);
+  ASSERT_EQ(flat_container->value[2].first.toStdString(), "joint_state/header/frame_id");
+  ASSERT_EQ(flat_container->value[2].second.convert<std::string>(), "base");
 
-  ASSERT_EQ(flat_container->value[5].first.toStdString(), ("joint_state/velocity[0]"));
-  ASSERT_EQ(flat_container->value[5].second.convert<int>(), 30);
-  ASSERT_EQ(flat_container->value[6].first.toStdString(), ("joint_state/velocity[1]"));
-  ASSERT_EQ(flat_container->value[6].second.convert<int>(), 31);
-  ASSERT_EQ(flat_container->value[7].first.toStdString(), ("joint_state/velocity[2]"));
-  ASSERT_EQ(flat_container->value[7].second.convert<int>(), 32);
+  ASSERT_EQ(flat_container->value[3].first.toStdString(), "joint_state/name[0]");
+  ASSERT_EQ(flat_container->value[3].second.convert<std::string>(), "hola");
+  ASSERT_EQ(flat_container->value[4].first.toStdString(), "joint_state/name[1]");
+  ASSERT_EQ(flat_container->value[4].second.convert<std::string>(), "ciao");
+  ASSERT_EQ(flat_container->value[5].first.toStdString(), "joint_state/name[2]");
+  ASSERT_EQ(flat_container->value[5].second.convert<std::string>(), "bye");
 
-  ASSERT_EQ(flat_container->value[8].first.toStdString(), ("joint_state/effort[0]"));
-  ASSERT_EQ(flat_container->value[8].second.convert<int>(), 50);
-  ASSERT_EQ(flat_container->value[9].first.toStdString(), ("joint_state/effort[1]"));
-  ASSERT_EQ(flat_container->value[9].second.convert<int>(), 51);
-  ASSERT_EQ(flat_container->value[10].first.toStdString(), ("joint_state/effort[2]"));
-  ASSERT_EQ(flat_container->value[10].second.convert<int>(), 52);
+  ASSERT_EQ(flat_container->value[6].first.toStdString(), "joint_state/position[0]");
+  ASSERT_EQ(flat_container->value[6].second.convert<int>(), 10);
+  ASSERT_EQ(flat_container->value[7].first.toStdString(), "joint_state/position[1]");
+  ASSERT_EQ(flat_container->value[7].second.convert<int>(), 11);
+  ASSERT_EQ(flat_container->value[8].first.toStdString(), "joint_state/position[2]");
+  ASSERT_EQ(flat_container->value[8].second.convert<int>(), 12);
 
-  ASSERT_EQ(flat_container->name[0].first.toStdString(), ("joint_state/header/frame_id"));
-  ASSERT_EQ(flat_container->name[0].second, ("base"));
+  ASSERT_EQ(flat_container->value[9].first.toStdString(), "joint_state/velocity[0]");
+  ASSERT_EQ(flat_container->value[9].second.convert<int>(), 30);
+  ASSERT_EQ(flat_container->value[10].first.toStdString(), "joint_state/velocity[1]");
+  ASSERT_EQ(flat_container->value[10].second.convert<int>(), 31);
+  ASSERT_EQ(flat_container->value[11].first.toStdString(), "joint_state/velocity[2]");
+  ASSERT_EQ(flat_container->value[11].second.convert<int>(), 32);
 
-  ASSERT_EQ(flat_container->name[1].first.toStdString(), ("joint_state/name[0]"));
-  ASSERT_EQ(flat_container->name[1].second, ("hola"));
-
-  ASSERT_EQ(flat_container->name[2].first.toStdString(), ("joint_state/name[1]"));
-  ASSERT_EQ(flat_container->name[2].second, ("ciao"));
-
-  ASSERT_EQ(flat_container->name[3].first.toStdString(), ("joint_state/name[2]"));
-  ASSERT_EQ(flat_container->name[3].second, ("bye"));
+  ASSERT_EQ(flat_container->value[12].first.toStdString(), "joint_state/effort[0]");
+  ASSERT_EQ(flat_container->value[12].second.convert<int>(), 50);
+  ASSERT_EQ(flat_container->value[13].first.toStdString(), "joint_state/effort[1]");
+  ASSERT_EQ(flat_container->value[13].second.convert<int>(), 51);
+  ASSERT_EQ(flat_container->value[14].first.toStdString(), "joint_state/effort[2]");
+  ASSERT_EQ(flat_container->value[14].second.convert<int>(), 52);
 }
 
 std::vector<uint8_t> EncodeJointState(const sensor_msgs::msg::JointState& joint_state) {
