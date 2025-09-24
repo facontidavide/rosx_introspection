@@ -1,19 +1,16 @@
-#include "doctest.h"
-
-#include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/JointState.h>
 
+#include "doctest.h"
 #include "rosx_introspection/ros_parser.hpp"
-
 #include "rosx_introspection/ros_utils/ros1_helpers.hpp"
 
 using namespace RosMsgParser;
 
-TEST_CASE("Parse ROS1 [JointState]")
-{
+TEST_CASE("Parse ROS1 [JointState]") {
   ParsersCollection<ROS_Deserializer> parser;
-  parser.registerParser("joint_state", GetMessageType<sensor_msgs::JointState>(),
-                        GetMessageDefinition<sensor_msgs::JointState>());
+  parser.registerParser(
+      "joint_state", GetMessageType<sensor_msgs::JointState>(), GetMessageDefinition<sensor_msgs::JointState>());
 
   sensor_msgs::JointState joint_state;
 
@@ -32,8 +29,7 @@ TEST_CASE("Parse ROS1 [JointState]")
   names[1] = ("ciao");
   names[2] = ("bye");
 
-  for (int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     joint_state.name[i] = names[i];
     joint_state.position[i] = 10 + i;
     joint_state.velocity[i] = 30 + i;
@@ -44,13 +40,11 @@ TEST_CASE("Parse ROS1 [JointState]")
 
   auto flat_container = parser.deserialize("joint_state", Span<uint8_t>(buffer));
 
-  for (auto& it : flat_container->value)
-  {
+  for (auto& it : flat_container->value) {
     std::cout << it.first << " >> " << it.second.convert<double>() << std::endl;
   }
 
-  for (auto& it : flat_container->name)
-  {
+  for (auto& it : flat_container->name) {
     std::cout << it.first << " >> " << it.second << std::endl;
   }
 

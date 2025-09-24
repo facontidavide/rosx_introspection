@@ -23,15 +23,15 @@
 
 #pragma once
 
-#include <vector>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <unordered_map>
-#include <iostream>
+#include <vector>
+
 #include "rosx_introspection/ros_type.hpp"
 
-namespace RosMsgParser
-{
+namespace RosMsgParser {
 
 class ROSMessage;
 
@@ -43,50 +43,42 @@ class Parser;
  * @brief A ROSMessage will contain one or more ROSField(s). Each field is little more
  * than a name / type pair.
  */
-class ROSField
-{
-public:
+class ROSField {
+ public:
   ROSField(const ROSType& type, const std::string& name);
 
   ROSField(const std::string& definition);
 
-  const std::string& name() const
-  {
+  const std::string& name() const {
     return _fieldname;
   }
 
-  const ROSType& type() const
-  {
+  const ROSType& type() const {
     return _type;
   }
 
-  void changeType(const ROSType& type)
-  {
+  void changeType(const ROSType& type) {
     _type = type;
   }
 
   /// True if field is a constant in message definition
-  bool isConstant() const
-  {
+  bool isConstant() const {
     return _is_constant;
   }
 
   /// If constant, value of field, else undefined
-  const std::string& value() const
-  {
+  const std::string& value() const {
     return _value;
   }
 
   /// True if the type is an array
-  bool isArray() const
-  {
+  bool isArray() const {
     return _is_array;
   }
 
   /// 1 if !is_array, -1 if is_array and array is
   /// variable length, otherwise length in name
-  int arraySize() const
-  {
+  int arraySize() const {
     return _array_size;
   }
 
@@ -94,7 +86,7 @@ public:
 
   std::shared_ptr<ROSMessage> getMessagePtr(const RosMessageLibrary& library) const;
 
-protected:
+ protected:
   std::string _fieldname;
   ROSType _type;
   std::string _value;

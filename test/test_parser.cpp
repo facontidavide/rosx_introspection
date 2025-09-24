@@ -3,25 +3,25 @@
 #include "rosx_introspection/ros_message.hpp"
 #include "rosx_introspection/stringtree_leaf.hpp"
 
-const std::string vector_def = "# This represents a vector in free space. \n"
-                               "# It is only meant to represent a direction. Therefore, "
-                               "it does not\n"
-                               "# make sense to apply a translation to it (e.g., when "
-                               "applying a \n"
-                               "# generic rigid transformation to a Vector3, tf2 will "
-                               "only apply the\n"
-                               "# rotation). If you want your data to be translatable "
-                               "too, use the\n"
-                               "# geometry_msgs/Point message instead.\n"
-                               "\n"
-                               "float64 x\n"
-                               "float64 y\n"
-                               "float64 z\n";
+const std::string vector_def =
+    "# This represents a vector in free space. \n"
+    "# It is only meant to represent a direction. Therefore, "
+    "it does not\n"
+    "# make sense to apply a translation to it (e.g., when "
+    "applying a \n"
+    "# generic rigid transformation to a Vector3, tf2 will "
+    "only apply the\n"
+    "# rotation). If you want your data to be translatable "
+    "too, use the\n"
+    "# geometry_msgs/Point message instead.\n"
+    "\n"
+    "float64 x\n"
+    "float64 y\n"
+    "float64 z\n";
 
 using namespace RosMsgParser;
 
-TEST(Parser, BasicTest)
-{
+TEST(Parser, BasicTest) {
   ROSMessage msg(vector_def);
 
   ASSERT_EQ(msg.fields().size(), 3);
@@ -35,65 +35,66 @@ TEST(Parser, BasicTest)
   ASSERT_EQ(msg.field(2).type().typeID(), FLOAT64);
 }
 
-const std::string pose_stamped_def = "# A Pose with reference coordinate frame and "
-                                     "timestamp\n"
-                                     "Header header\n"
-                                     "Pose pose\n"
-                                     "\n"
-                                     "==================================================="
-                                     "=============================\n"
-                                     "MSG: std_msgs/Header\n"
-                                     "# Standard metadata for higher-level stamped data "
-                                     "types.\n"
-                                     "# This is generally used to communicate "
-                                     "timestamped data \n"
-                                     "# in a particular coordinate frame.\n"
-                                     "# \n"
-                                     "# sequence ID: consecutively increasing ID \n"
-                                     "uint32 seq\n"
-                                     "#Two-integer timestamp that is expressed as:\n"
-                                     "# * stamp.sec: seconds (stamp_secs) since epoch "
-                                     "(in Python the variable is called 'secs')\n"
-                                     "# * stamp.nsec: nanoseconds since stamp_secs (in "
-                                     "Python the variable is called 'nsecs')\n"
-                                     "# time-handling sugar is provided by the client "
-                                     "library\n"
-                                     "time stamp\n"
-                                     "#Frame this data is associated with\n"
-                                     "string frame_id\n"
-                                     "\n"
-                                     "==================================================="
-                                     "=============================\n"
-                                     "MSG: geometry_msgs/Pose\n"
-                                     "# A representation of pose in free space, composed "
-                                     "of position and orientation. \n"
-                                     "Point position\n"
-                                     "Quaternion orientation\n"
-                                     "\n"
-                                     "==================================================="
-                                     "=============================\n"
-                                     "MSG: geometry_msgs/Point\n"
-                                     "# This contains the position of a point in free "
-                                     "space\n"
-                                     "float64 x\n"
-                                     "float64 y\n"
-                                     "float64 z\n"
-                                     "\n"
-                                     "==================================================="
-                                     "=============================\n"
-                                     "MSG: geometry_msgs/Quaternion\n"
-                                     "# This represents an orientation in free space in "
-                                     "quaternion form.\n"
-                                     "\n"
-                                     "float64 x\n"
-                                     "float64 y\n"
-                                     "float64 z\n"
-                                     "float64 w\n";
+const std::string pose_stamped_def =
+    "# A Pose with reference coordinate frame and "
+    "timestamp\n"
+    "Header header\n"
+    "Pose pose\n"
+    "\n"
+    "==================================================="
+    "=============================\n"
+    "MSG: std_msgs/Header\n"
+    "# Standard metadata for higher-level stamped data "
+    "types.\n"
+    "# This is generally used to communicate "
+    "timestamped data \n"
+    "# in a particular coordinate frame.\n"
+    "# \n"
+    "# sequence ID: consecutively increasing ID \n"
+    "uint32 seq\n"
+    "#Two-integer timestamp that is expressed as:\n"
+    "# * stamp.sec: seconds (stamp_secs) since epoch "
+    "(in Python the variable is called 'secs')\n"
+    "# * stamp.nsec: nanoseconds since stamp_secs (in "
+    "Python the variable is called 'nsecs')\n"
+    "# time-handling sugar is provided by the client "
+    "library\n"
+    "time stamp\n"
+    "#Frame this data is associated with\n"
+    "string frame_id\n"
+    "\n"
+    "==================================================="
+    "=============================\n"
+    "MSG: geometry_msgs/Pose\n"
+    "# A representation of pose in free space, composed "
+    "of position and orientation. \n"
+    "Point position\n"
+    "Quaternion orientation\n"
+    "\n"
+    "==================================================="
+    "=============================\n"
+    "MSG: geometry_msgs/Point\n"
+    "# This contains the position of a point in free "
+    "space\n"
+    "float64 x\n"
+    "float64 y\n"
+    "float64 z\n"
+    "\n"
+    "==================================================="
+    "=============================\n"
+    "MSG: geometry_msgs/Quaternion\n"
+    "# This represents an orientation in free space in "
+    "quaternion form.\n"
+    "\n"
+    "float64 x\n"
+    "float64 y\n"
+    "float64 z\n"
+    "float64 w\n";
 
-TEST(Parser, CompositeROS1)
-{
-  auto msg_parsed = ParseMessageDefinitions(pose_stamped_def, ROSType("geometry_msgs/"
-                                                                      "PoseStamped"));
+TEST(Parser, CompositeROS1) {
+  auto msg_parsed = ParseMessageDefinitions(
+      pose_stamped_def, ROSType("geometry_msgs/"
+                                "PoseStamped"));
 
   ASSERT_EQ(msg_parsed.size(), 5);
 
@@ -141,17 +142,13 @@ TEST(Parser, CompositeROS1)
 
   auto recursiveLeaf = std::function<void(const FieldTreeNode* node)>();
   recursiveLeaf = [&](const FieldTreeNode* node) {
-    if (node->isLeaf())
-    {
+    if (node->isLeaf()) {
       FieldLeaf leaf;
       leaf.node = node;
       FieldsVector fields_vector(leaf);
       leaf_str.push_back(fields_vector.toStdString());
-    }
-    else
-    {
-      for (const auto& child_node : node->children())
-      {
+    } else {
+      for (const auto& child_node : node->children()) {
         recursiveLeaf(&child_node);
       }
     }
@@ -175,8 +172,7 @@ TEST(Parser, CompositeROS1)
   ASSERT_EQ(leaf_str[index++], "pose_stamped/pose/orientation/w");
 }
 
-TEST(Parser, QuaternionFieldROS2)
-{
+TEST(Parser, QuaternionFieldROS2) {
   ROSField field("float64 x 0");
 
   ASSERT_EQ(field.type().typeID(), FLOAT64);

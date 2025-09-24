@@ -1,21 +1,11 @@
 #include "rosx_introspection/deserializer.hpp"
-#include <fastcdr/Cdr.h>
 
-/* make sure to remain compatible with previous version of fastCdr */
-#if ((FASTCDR_VERSION_MAJOR < 2))
-#define get_buffer_pointer() getBufferPointer()
-#define get_current_position() getCurrentPosition()
-#define get_serialized_data_length() getSerializedDataLength()
-#define CdrVersion Cdr
-#endif
+#include "rosx_introspection/contrib/nanocdr.hpp"
 
-namespace RosMsgParser
-{
+namespace RosMsgParser {
 
-Variant ROS_Deserializer::deserialize(BuiltinType type)
-{
-  switch (type)
-  {
+Variant ROS_Deserializer::deserialize(BuiltinType type) {
+  switch (type) {
     case BOOL:
       return deserialize<bool>();
     case CHAR:
@@ -59,17 +49,14 @@ Variant ROS_Deserializer::deserialize(BuiltinType type)
   return {};
 }
 
-void ROS_Deserializer::deserializeString(std::string& dst)
-{
+void ROS_Deserializer::deserializeString(std::string& dst) {
   uint32_t string_size = deserialize<uint32_t>();
 
-  if (string_size > _bytes_left)
-  {
+  if (string_size > _bytes_left) {
     throw std::runtime_error("Buffer overrun in ROS_Deserializer::deserializeString");
   }
 
-  if (string_size == 0)
-  {
+  if (string_size == 0) {
     dst = {};
     return;
   }
@@ -81,21 +68,18 @@ void ROS_Deserializer::deserializeString(std::string& dst)
   _bytes_left -= string_size;
 }
 
-uint32_t ROS_Deserializer::deserializeUInt32()
-{
+uint32_t ROS_Deserializer::deserializeUInt32() {
   return deserialize<uint32_t>();
 }
 
-Span<const uint8_t> ROS_Deserializer::deserializeByteSequence()
-{
+Span<const uint8_t> ROS_Deserializer::deserializeByteSequence() {
   uint32_t vect_size = deserialize<uint32_t>();
-  if (vect_size > _bytes_left)
-  {
-    throw std::runtime_error("Buffer overrun in "
-                             "ROS_Deserializer::deserializeByteSequence");
+  if (vect_size > _bytes_left) {
+    throw std::runtime_error(
+        "Buffer overrun in "
+        "ROS_Deserializer::deserializeByteSequence");
   }
-  if (vect_size == 0)
-  {
+  if (vect_size == 0) {
     return {};
   }
   Span<const uint8_t> out(_ptr, vect_size);
@@ -103,23 +87,19 @@ Span<const uint8_t> ROS_Deserializer::deserializeByteSequence()
   return out;
 }
 
-const uint8_t* ROS_Deserializer::getCurrentPtr() const
-{
+const uint8_t* ROS_Deserializer::getCurrentPtr() const {
   return _ptr;
 }
 
-void ROS_Deserializer::jump(size_t bytes)
-{
-  if (bytes > _bytes_left)
-  {
+void ROS_Deserializer::jump(size_t bytes) {
+  if (bytes > _bytes_left) {
     throw std::runtime_error("Buffer overrun");
   }
   _ptr += bytes;
   _bytes_left -= bytes;
 }
 
-void ROS_Deserializer::reset()
-{
+void ROS_Deserializer::reset() {
   _ptr = _buffer.data();
   _bytes_left = _buffer.size();
 }
@@ -127,108 +107,94 @@ void ROS_Deserializer::reset()
 // ----------------------------------------------
 
 template <typename T>
-static T Deserialize(eprosima::fastcdr::Cdr& cdr)
-{
+static T Deserialize(nanocdr::Decoder& decoder) {
   T tmp;
-  cdr.deserialize(tmp);
+  decoder.decode(tmp);
   return tmp;
 }
 
-Variant FastCDR_Deserializer::deserialize(BuiltinType type)
-{
-  switch (type)
-  {
+Variant NanoCDR_Deserializer::deserialize(BuiltinType type) {
+  switch (type) {
     case BOOL:
-      return Deserialize<bool>(*_cdr);
+      return Deserialize<bool>(*_cdr_decoder);
     case CHAR:
-      return Deserialize<char>(*_cdr);
+      return Deserialize<char>(*_cdr_decoder);
     case BYTE:
     case UINT8:
-      return Deserialize<uint8_t>(*_cdr);
+      return Deserialize<uint8_t>(*_cdr_decoder);
     case UINT16:
-      return Deserialize<uint16_t>(*_cdr);
+      return Deserialize<uint16_t>(*_cdr_decoder);
     case UINT32:
-      return Deserialize<uint32_t>(*_cdr);
+      return Deserialize<uint32_t>(*_cdr_decoder);
     case UINT64:
-      return Deserialize<uint64_t>(*_cdr);
+      return Deserialize<uint64_t>(*_cdr_decoder);
 
     case INT8:
-      return Deserialize<int8_t>(*_cdr);
+      return Deserialize<int8_t>(*_cdr_decoder);
     case INT16:
-      return Deserialize<int16_t>(*_cdr);
+      return Deserialize<int16_t>(*_cdr_decoder);
     case INT32:
-      return Deserialize<int32_t>(*_cdr);
+      return Deserialize<int32_t>(*_cdr_decoder);
     case INT64:
-      return Deserialize<int64_t>(*_cdr);
+      return Deserialize<int64_t>(*_cdr_decoder);
 
     case FLOAT32:
-      return Deserialize<float>(*_cdr);
+      return Deserialize<float>(*_cdr_decoder);
     case FLOAT64:
-      return Deserialize<double>(*_cdr);
+      return Deserialize<double>(*_cdr_decoder);
 
     case DURATION:
     case TIME: {
       RosMsgParser::Time tmp;
-      tmp.sec = Deserialize<uint32_t>(*_cdr);
-      tmp.nsec = Deserialize<uint32_t>(*_cdr);
+      tmp.sec = Deserialize<uint32_t>(*_cdr_decoder);
+      tmp.nsec = Deserialize<uint32_t>(*_cdr_decoder);
       return tmp;
     }
 
     default:
-      throw std::runtime_error("FastCDR_Deserializer: type not recognized");
+      throw std::runtime_error("NanoCDR_Deserializer: type not recognized");
   }
 
   return {};
 }
 
-void FastCDR_Deserializer::deserializeString(std::string& dst)
-{
-  _cdr->deserialize(dst);
+void NanoCDR_Deserializer::deserializeString(std::string& dst) {
+  _cdr_decoder->decode(dst);
 }
 
-uint32_t FastCDR_Deserializer::deserializeUInt32()
-{
-  return Deserialize<uint32_t>(*_cdr);
+uint32_t NanoCDR_Deserializer::deserializeUInt32() {
+  return Deserialize<uint32_t>(*_cdr_decoder);
 }
 
-Span<const uint8_t> FastCDR_Deserializer::deserializeByteSequence()
-{
+Span<const uint8_t> NanoCDR_Deserializer::deserializeByteSequence() {
   //  thread_local std::vector<uint8_t> tmp;
   //  _cdr->deserialize(tmp);
   //  return {tmp.data(), tmp.size()};
 
   uint32_t seqLength = 0;
-  _cdr->deserialize(seqLength);
+  _cdr_decoder->decode(seqLength);
 
   // dirty trick to change the internal state of cdr
-  auto* ptr = _cdr->get_current_position();
+  const auto* ptr = _cdr_decoder->currentBuffer().data();
 
   uint8_t dummy;
-  _cdr->deserialize(dummy);
+  _cdr_decoder->decode(dummy);
 
-  _cdr->jump(seqLength - 1);
-  return { reinterpret_cast<const uint8_t*>(ptr), seqLength };
+  _cdr_decoder->jump(seqLength - 1);
+  return {reinterpret_cast<const uint8_t*>(ptr), seqLength};
 }
 
-const uint8_t* FastCDR_Deserializer::getCurrentPtr() const
-{
-  return reinterpret_cast<const uint8_t*>(_cdr->get_buffer_pointer());
+const uint8_t* NanoCDR_Deserializer::getCurrentPtr() const {
+  return reinterpret_cast<const uint8_t*>(_cdr_decoder->currentBuffer().data());
 }
 
-void FastCDR_Deserializer::jump(size_t bytes)
-{
-  _cdr->jump(bytes);
+void NanoCDR_Deserializer::jump(size_t bytes) {
+  _cdr_decoder->jump(bytes);
 }
 
-void FastCDR_Deserializer::reset()
-{
-  using namespace eprosima::fastcdr;
-
-  char* buffer_ptr = reinterpret_cast<char*>(const_cast<uint8_t*>(_buffer.data()));
-
-  _cdr_buffer = std::make_shared<FastBuffer>(buffer_ptr, _buffer.size());
-  _cdr = std::make_shared<Cdr>(*_cdr_buffer, Cdr::DEFAULT_ENDIAN, CdrVersion::DDS_CDR);
-  _cdr->read_encapsulation();
+void NanoCDR_Deserializer::reset() {
+  nanocdr::ConstBuffer nano_buffer(_buffer.data(), _buffer.size());
+  _cdr_decoder = std::make_shared<nanocdr::Decoder>(nano_buffer);
 }
 
 }  // namespace RosMsgParser
