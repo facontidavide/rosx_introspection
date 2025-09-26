@@ -121,7 +121,7 @@ enum class Endianness : uint8_t
   CDR_LITTLE_ENDIAN = 0x01
 };
 
-constexpr Endianness getCurrentEndianness();
+inline Endianness getCurrentEndianness();
 
 template <typename T>
 inline void swapEndianness(T& val);
@@ -323,7 +323,7 @@ constexpr bool is_type_defined_v()
   return is_type_defined<T>::value;
 }
 
-constexpr Endianness getCurrentEndianness()
+inline Endianness getCurrentEndianness()
 {
   union
   {

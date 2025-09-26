@@ -52,7 +52,7 @@ inline int print_number(char* buffer, uint16_t value) {
     buffer[1] = DIGITS[value + 1];
     return 2;
   } else {
-    return sprintf(buffer, "%d", value);
+    return snprintf(buffer, 16, "%d", value);
   }
 }
 
