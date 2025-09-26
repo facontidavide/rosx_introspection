@@ -826,7 +826,7 @@ span_noreturn inline void throw_out_of_range( size_t idx, size_t size )
 {
     const char fmt[] = "span::at(): index '%lli' is out of range [0..%lli)";
     char buffer[ 2 * 20 + sizeof fmt ];
-    sprintf( buffer, fmt, static_cast<long long>(idx), static_cast<long long>(size) );
+    snprintf( buffer, sizeof(buffer), fmt, static_cast<long long>(idx), static_cast<long long>(size) );
 
     throw std::out_of_range( buffer );
 }
