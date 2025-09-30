@@ -31,9 +31,18 @@ set_target_properties(rosx_introspection_py PROPERTIES
   OUTPUT_NAME "rosx_introspection"  # This makes the .so file have the right name
 )
 
+# Determine installation directory
+# When building with scikit-build-core, use relative paths
+# Otherwise, use the system Python site-packages
+if(DEFINED SKBUILD)
+  set(ROSX_INSTALL_DIR "rosx_introspection")
+else()
+  set(ROSX_INSTALL_DIR "${Python_SITEARCH}/rosx_introspection")
+endif()
+
 # Install the Python module
 install(TARGETS rosx_introspection_py
-  LIBRARY DESTINATION ${Python_SITEARCH}/rosx_introspection)
+  LIBRARY DESTINATION ${ROSX_INSTALL_DIR})
 
 # Create __init__.py
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/__init__.py"
@@ -47,4 +56,4 @@ __all__ = ['Parser', 'parse_ros_message']
 
 # Install __init__.py
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/__init__.py"
-  DESTINATION ${Python_SITEARCH}/rosx_introspection)
+  DESTINATION ${ROSX_INSTALL_DIR})
