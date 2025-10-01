@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>rosx_introspection</name>
-  <version>2.0.0</version>
+  <version>2.0.1</version>
   <description>Parse any ROS/ROS2 message without compile-time information</description>
 
   <maintainer email="davide.faconti@gmail.com">Davide Faconti</maintainer>

@@ -2,8 +2,8 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+2.0.1 (2025-10-01)
+------------------
 * Merge pull request `#21 <https://github.com/facontidavide/rosx_introspection/issues/21>`_ from bryzhao/fix/scikit-build-core-compatibility
   Fix CMakeLists to support scikit-build-core installations
 * Fix CMakeLists to support scikit-build-core installations
