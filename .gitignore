@@ -1,3 +1,4 @@
 /build/*
 *.csv
 /build*
+_codeql_*
