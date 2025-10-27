@@ -178,8 +178,8 @@ MessageSchema::Ptr BuildMessageSchema(const std::string& topic_name, const std::
   };   // end of recursiveTreeCreator
 
   // build root and start recursion
-  auto root_field = new ROSField(schema->root_msg->type(), topic_name);
-  schema->field_tree.root()->setValue(root_field);
+  schema->root_field = std::make_unique<ROSField>(schema->root_msg->type(), topic_name);
+  schema->field_tree.root()->setValue(schema->root_field.get());
 
   recursiveTreeCreator(schema->root_msg, schema->field_tree.root());
 

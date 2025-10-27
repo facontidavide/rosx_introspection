@@ -74,6 +74,7 @@ struct MessageSchema {
   FieldTree field_tree;
   ROSMessage::Ptr root_msg;
   RosMessageLibrary msg_library;
+  std::unique_ptr<ROSField> root_field;
 };
 
 //------------------------------------------------
