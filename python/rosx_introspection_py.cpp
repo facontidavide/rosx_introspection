@@ -3,59 +3,10 @@
 #include <nanobind/stl/vector.h>
 
 #include <memory>
-#include <rosx_introspection/contrib/msgpack.hpp>
+#include <rosx_introspection/msgpack_utils.hpp>
 #include <rosx_introspection/ros_parser.hpp>
 #include <stdexcept>
 #include <vector>
-
-namespace details {
-void convertToMsgpack(const RosMsgParser::FlatMessage& flat_msg, std::vector<uint8_t>& msgpack_data) {
-  msgpack_data.clear();
-  msgpack_data.resize(1024 * 64);  // 64KB initial size
-
-  auto resize_if_needed = [&msgpack_data](size_t required_size) {
-    if (msgpack_data.size() < required_size) {
-      // Resize the buffer if it's not large enough
-      msgpack_data.resize(msgpack_data.size() * 2);
-    }
-  };
-
-  const uint32_t num_elements = flat_msg.value.size();
-  uint8_t* data_ptr = msgpack_data.data();
-
-  data_ptr += msgpack::pack_map(data_ptr, num_elements);
-
-  auto pack_variant = [](const RosMsgParser::Variant& number, uint8_t*& data) -> uint32_t {
-    switch (number.getTypeID()) {
-      case RosMsgParser::BuiltinType::UINT64:
-        return msgpack::pack_uint(data, number.extract<uint64_t>());
-      case RosMsgParser::BuiltinType::FLOAT64:
-        return msgpack::pack_double(data, number.extract<double>());
-      case RosMsgParser::BuiltinType::FLOAT32:
-        return msgpack::pack_float(data, number.extract<float>());
-      case RosMsgParser::BuiltinType::BOOL:
-        return msgpack::pack_bool(data, number.extract<bool>());
-      case RosMsgParser::BuiltinType::STRING:
-        return msgpack::pack_string(data, number.convert<std::string>());
-      default:
-        // fallback to int64 for all the other types
-        return msgpack::pack_int(data, number.convert<int64_t>());
-    }
-  };
-
-  std::string key_str;
-
-  // Write numerical values as key-value pairs
-  for (const auto& [key, num_value] : flat_msg.value) {
-    key.toStr(key_str);
-    resize_if_needed(4 + key_str.size() + 9);  // max key + max value size
-    data_ptr += msgpack::pack_string(data_ptr, key_str);
-    data_ptr += pack_variant(num_value, data_ptr);
-  }
-
-  msgpack_data.resize(static_cast<int>(data_ptr - msgpack_data.data()));
-}
-}  // namespace details
 
 namespace nb = nanobind;
 
@@ -89,7 +40,7 @@ class Parser {
       throw std::runtime_error("Failed to parse ROS message");
     }
 
-    details::convertToMsgpack(flat_msg_, output_buffer_);
+    RosMsgParser::convertToMsgpack(flat_msg_, output_buffer_);
     return nb::bytes(reinterpret_cast<const char*>(output_buffer_.data()), output_buffer_.size());
   }
 };
