@@ -75,7 +75,10 @@ inline T BufferToMessage(const void* bufferPtr, size_t bufferSize) {
   serialized_msg.buffer = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(bufferPtr));
 
   T message;
-  auto res = rmw_deserialize(&serialized_msg, type_support, &message);
+  auto ret = rmw_deserialize(&serialized_msg, type_support, &message);
+  if (ret != RMW_RET_OK) {
+    throw std::runtime_error("rmw_deserialize failed");
+  }
   return message;
 }
 

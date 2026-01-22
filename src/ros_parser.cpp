@@ -123,7 +123,7 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
       if (IS_BLOB) {
         ExpandVectorIfNecessary(flat_container->blob, blob_index);
 
-        if (array_size > deserializer->bytesLeft()) {
+        if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
           throw std::runtime_error(
               "Buffer overrun in deserializeIntoFlatContainer "
               "(blob)");
@@ -416,7 +416,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
         serializer->serializeUInt32(array_size);
       }
       if (has_json_value && is_fixed_array) {
-        int actual_size = (*json_value)[field_name.s].GetArray().Size();
+        auto actual_size = static_cast<uint32_t>((*json_value)[field_name.s].GetArray().Size());
         if (array_size != actual_size) {
           throw std::runtime_error(std::string("Fixed array size mismatch in field: ") + field.name());
         }
@@ -424,7 +424,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
 
       const auto type_id = field_type.typeID();
 
-      for (int i = 0; i < array_size; i++) {
+      for (uint32_t i = 0; i < array_size; i++) {
         // is !has_json_value , we will serialize a zero value
         rapidjson::Value zero_value = rapidjson::Value(0);
         rapidjson::Value* value_field = &zero_value;
