@@ -2,7 +2,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <rosbag2_cpp/types/introspection_message.hpp>
-#include <rosbag2_cpp/typesupport_helpers.hpp>
+#include <rclcpp/typesupport_helpers.hpp>
 #include <rosidl_typesupport_cpp/identifier.hpp>
 #include <rosidl_typesupport_introspection_cpp/identifier.hpp>
 
