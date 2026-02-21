@@ -37,6 +37,7 @@ add_library(rosx_introspection
     src/ros_parser.cpp
     src/deserializer.cpp
     src/serializer.cpp
+    src/msgpack_utils.cpp
     ${EXTRA_SRC}
     )
 
