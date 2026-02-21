@@ -482,7 +482,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
             serializer->serializeUInt32(secs);
 
             uint32_t nsecs = value_field->GetObject()["nsecs"].GetInt();
-            serializer->serializeUInt32(secs);
+            serializer->serializeUInt32(nsecs);
           } break;
 
           case STRING: {
