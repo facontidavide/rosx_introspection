@@ -32,19 +32,25 @@ void convertToMsgpack(const FlatMessage& flat_msg, std::vector<uint8_t>& msgpack
   msgpack_data.clear();
   msgpack_data.resize(1024 * 64);  // 64KB initial size
 
-  auto resize_if_needed = [&msgpack_data](size_t required_size) {
-    if (msgpack_data.size() < required_size) {
-      // Resize the buffer if it's not large enough
-      msgpack_data.resize(msgpack_data.size() * 2);
+  size_t offset = 0;
+
+  auto resize_if_needed = [&msgpack_data, &offset](size_t additional_size) {
+    const size_t required_size = offset + additional_size;
+    if (msgpack_data.size() >= required_size) {
+      return;
     }
+    size_t new_size = msgpack_data.size();
+    while (new_size < required_size) {
+      new_size *= 2;
+    }
+    msgpack_data.resize(new_size);
   };
 
   const uint32_t num_elements = flat_msg.value.size();
-  uint8_t* data_ptr = msgpack_data.data();
+  resize_if_needed(5);
+  offset += msgpack::pack_map(msgpack_data.data(), num_elements);
 
-  data_ptr += msgpack::pack_map(data_ptr, num_elements);
-
-  auto pack_variant = [](const Variant& number, uint8_t*& data) -> uint32_t {
+  auto pack_variant = [](const Variant& number, uint8_t* data) -> uint32_t {
     switch (number.getTypeID()) {
       case BuiltinType::UINT64:
         return msgpack::pack_uint(data, number.extract<uint64_t>());
@@ -67,12 +73,12 @@ void convertToMsgpack(const FlatMessage& flat_msg, std::vector<uint8_t>& msgpack
   // Write numerical values as key-value pairs
   for (const auto& [key, num_value] : flat_msg.value) {
     key.toStr(key_str);
-    resize_if_needed(4 + key_str.size() + 9);  // max key + max value size
-    data_ptr += msgpack::pack_string(data_ptr, key_str);
-    data_ptr += pack_variant(num_value, data_ptr);
+    resize_if_needed(5 + key_str.size() + 9);  // max key header + key + max value size
+    offset += msgpack::pack_string(msgpack_data.data() + offset, key_str);
+    offset += pack_variant(num_value, msgpack_data.data() + offset);
   }
 
-  msgpack_data.resize(static_cast<int>(data_ptr - msgpack_data.data()));
+  msgpack_data.resize(offset);
 }
 
 }  // namespace RosMsgParser

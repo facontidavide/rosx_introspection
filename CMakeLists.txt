@@ -67,7 +67,11 @@ if(ROSX_HAS_JSON)
 
     target_compile_definitions(rosx_introspection PRIVATE ROSX_HAS_JSON)
     if(NOT USING_ROS2)
-        target_link_libraries(rosx_introspection PRIVATE rapidjson)
+        if(TARGET rapidjson)
+            target_link_libraries(rosx_introspection PRIVATE rapidjson)
+        elseif(RapidJSON_INCLUDE_DIRS)
+            target_include_directories(rosx_introspection PRIVATE ${RapidJSON_INCLUDE_DIRS})
+        endif()
     endif()
 
 endif(ROSX_HAS_JSON)

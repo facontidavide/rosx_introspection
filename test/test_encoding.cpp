@@ -1,10 +1,37 @@
 #include <gtest/gtest.h>
 
 #include "rosx_introspection/deserializer.hpp"
+#include "rosx_introspection/msgpack_utils.hpp"
 #include "rosx_introspection/ros_message.hpp"
+#include "rosx_introspection/ros_parser.hpp"
 #include "rosx_introspection/serializer.hpp"
 
 using namespace RosMsgParser;
+
+namespace {
+
+bool HasJsonSupport() {
+  Parser parser("topic", ROSType("my_pkg/Test"), "uint32 value\n");
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(0)));
+
+  NanoCDR_Deserializer deserializer;
+  std::string json;
+  try {
+    return parser.deserializeIntoJson(
+        Span<const uint8_t>(
+            reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+        &json, &deserializer);
+  } catch (const std::runtime_error& ex) {
+    if (std::string(ex.what()).find("without JSON support") != std::string::npos) {
+      return false;
+    }
+    throw;
+  }
+}
+
+}  // namespace
 
 TEST(NanoSerializer, RoundTrip) {
   // Create and initialize serializer
@@ -124,4 +151,157 @@ TEST(NanoSerializer, RoundTrip) {
 
   // Verify all bytes have been consumed
   EXPECT_EQ(deserializer.bytesLeft(), 0);
+}
+
+TEST(NanoDeserializer, EmptyByteSequence) {
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(0);
+
+  NanoCDR_Deserializer deserializer;
+  deserializer.init(
+      Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()));
+
+  Span<const uint8_t> bytes;
+  EXPECT_NO_THROW(bytes = deserializer.deserializeByteSequence());
+  EXPECT_EQ(bytes.size(), 0u);
+  EXPECT_EQ(deserializer.bytesLeft(), 0u);
+}
+
+TEST(ParserJson, LargeArrayShouldNotCorruptFollowingFields) {
+  if (!HasJsonSupport()) {
+    GTEST_SKIP() << "JSON support disabled in this build";
+  }
+
+  Parser parser("topic", ROSType("my_pkg/Test"), "uint8[] data\nuint32 tail\n");
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(101);
+  for (int i = 0; i < 101; i++) {
+    serializer.serialize(UINT8, Variant(uint8_t(i)));
+  }
+  serializer.serialize(UINT32, Variant(uint32_t(42)));
+
+  NanoCDR_Deserializer deserializer;
+  std::string json;
+  ASSERT_TRUE(parser.deserializeIntoJson(
+      Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+      &json, &deserializer));
+
+  EXPECT_NE(json.find("\"tail\":42"), std::string::npos);
+}
+
+TEST(ParserFlatMessage, LargeUint8ArrayShouldBeBlob) {
+  Parser parser("topic", ROSType("my_pkg/Test"), "uint8[] data\n");
+  parser.setMaxArrayPolicy(Parser::DISCARD_LARGE_ARRAYS, 100);
+  parser.setBlobPolicy(Parser::STORE_BLOB_AS_COPY);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(101);
+  for (int i = 0; i < 101; i++) {
+    serializer.serialize(UINT8, Variant(uint8_t(i)));
+  }
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(
+      Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+      &flat, &deserializer));
+
+  EXPECT_EQ(flat.blob.size(), 1u);
+  EXPECT_EQ(flat.value.size(), 0u);
+}
+
+TEST(ParserJson, NegativeInt8ShouldNotAbort) {
+  if (!HasJsonSupport()) {
+    GTEST_SKIP() << "JSON support disabled in this build";
+  }
+
+  ASSERT_EXIT(
+      {
+        Parser parser("topic", ROSType("my_pkg/Test"), "int8 value\n");
+        NanoCDR_Serializer serializer;
+        parser.serializeFromJson(R"({"value":-1})", &serializer);
+
+        NanoCDR_Deserializer deserializer;
+        deserializer.init(Span<const uint8_t>(
+            reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()));
+        const auto decoded = deserializer.deserialize(INT8).convert<int8_t>();
+        if (decoded != -1) {
+          std::_Exit(2);
+        }
+        std::_Exit(0);
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+
+TEST(ParserJson, OmittedBoolShouldDefaultToFalse) {
+  if (!HasJsonSupport()) {
+    GTEST_SKIP() << "JSON support disabled in this build";
+  }
+
+  ASSERT_EXIT(
+      {
+        Parser parser("topic", ROSType("my_pkg/Test"), "bool flag\n");
+        NanoCDR_Serializer serializer;
+        parser.serializeFromJson("{}", &serializer);
+
+        NanoCDR_Deserializer deserializer;
+        deserializer.init(Span<const uint8_t>(
+            reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()));
+        const auto decoded = deserializer.deserialize(BOOL).convert<uint8_t>();
+        if (decoded != 0) {
+          std::_Exit(2);
+        }
+        std::_Exit(0);
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+
+TEST(ParserJson, MalformedJsonShouldNotAbort) {
+  if (!HasJsonSupport()) {
+    GTEST_SKIP() << "JSON support disabled in this build";
+  }
+
+  ASSERT_EXIT(
+      {
+        Parser parser("topic", ROSType("my_pkg/Test"), "uint32 value\n");
+        NanoCDR_Serializer serializer;
+        try {
+          parser.serializeFromJson("{", &serializer);
+        } catch (...) {
+          std::_Exit(0);
+        }
+        std::_Exit(0);
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+
+TEST(Msgpack, LargeInputShouldNotCrash) {
+  ASSERT_EXIT(
+      {
+        FlatMessage flat;
+        flat.value.reserve(200000);
+        for (int i = 0; i < 200000; i++) {
+          flat.value.emplace_back(FieldsVector(), Variant(int64_t(i)));
+        }
+
+        std::vector<uint8_t> msgpack;
+        convertToMsgpack(flat, msgpack);
+        if (msgpack.empty()) {
+          std::_Exit(2);
+        }
+        std::_Exit(0);
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+
+TEST(ROSDeserializer, UnsupportedTypeShouldThrow) {
+  ROS_Deserializer deserializer;
+  std::vector<uint8_t> buffer(1, 0);
+  deserializer.init(Span<const uint8_t>(buffer.data(), buffer.size()));
+
+  EXPECT_THROW(deserializer.deserialize(OTHER), std::runtime_error);
 }

@@ -196,7 +196,7 @@ inline TreeNode<T>* TreeNode<T>::addChild(const T& value) {
 template <typename T>
 template <typename Vect>
 inline const TreeNode<T>* Tree<T>::find(const Vect& concatenated_values, bool partial_allowed) {
-  TreeNode<T>* node = &_root;
+  TreeNode<T>* node = _root.get();
 
   for (const auto& value : concatenated_values) {
     bool found = false;

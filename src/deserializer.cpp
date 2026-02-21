@@ -43,7 +43,7 @@ Variant ROS_Deserializer::deserialize(BuiltinType type) {
     }
 
     default:
-      std::runtime_error("ROS_Deserializer: type not recognized");
+      throw std::runtime_error("ROS_Deserializer: type not recognized");
   }
 
   return {};
@@ -167,20 +167,15 @@ uint32_t NanoCDR_Deserializer::deserializeUInt32() {
 }
 
 Span<const uint8_t> NanoCDR_Deserializer::deserializeByteSequence() {
-  //  thread_local std::vector<uint8_t> tmp;
-  //  _cdr->deserialize(tmp);
-  //  return {tmp.data(), tmp.size()};
-
   uint32_t seqLength = 0;
   _cdr_decoder->decode(seqLength);
 
-  // dirty trick to change the internal state of cdr
+  if (seqLength == 0) {
+    return {};
+  }
+
   const auto* ptr = _cdr_decoder->currentBuffer().data();
-
-  uint8_t dummy;
-  _cdr_decoder->decode(dummy);
-
-  _cdr_decoder->jump(seqLength - 1);
+  _cdr_decoder->jump(seqLength);
   return {reinterpret_cast<const uint8_t*>(ptr), seqLength};
 }
 

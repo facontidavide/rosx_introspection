@@ -24,6 +24,8 @@
 #include "rosx_introspection/ros_parser.hpp"
 
 #include <functional>
+#include <limits>
+#include <type_traits>
 
 #ifdef ROSX_HAS_JSON
 #include "rapidjson/document.h"
@@ -109,7 +111,7 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
       bool IS_BLOB = false;
 
       // Stop storing it if is NOT a blob and a very large array.
-      if (array_size > static_cast<int32_t>(_max_array_size) && field_type.typeID() == BuiltinType::OTHER) {
+      if (array_size > static_cast<int32_t>(_max_array_size)) {
         if (builtinSize(field_type.typeID()) == 1) {
           IS_BLOB = true;
         } else {
@@ -229,8 +231,6 @@ bool Parser::deserializeIntoJson(
   rapidjson::Document json_document;
   rapidjson::Document::AllocatorType& alloc = json_document.GetAllocator();
 
-  size_t buffer_offset = 0;
-
   std::function<void(const ROSMessage*, rapidjson::Value&)> deserializeImpl;
 
   deserializeImpl = [&](const ROSMessage* msg_node, rapidjson::Value& json_value) {
@@ -250,14 +250,16 @@ bool Parser::deserializeIntoJson(
         array_size = deserializer->deserializeUInt32();
       }
 
-      // Stop storing if it is a blob.
-      if (array_size > static_cast<int32_t>(_max_array_size)) {
-        if (buffer_offset + array_size > static_cast<std::size_t>(buffer.size())) {
+      const bool skip_large_byte_array =
+          field.isArray() && array_size > static_cast<int32_t>(_max_array_size) && field_type.isBuiltin() &&
+          builtinSize(field_type.typeID()) == 1;
+
+      if (skip_large_byte_array) {
+        if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
           throw std::runtime_error("Buffer overrun in blob");
         }
-        buffer_offset += array_size;
-      } else  // NOT a BLOB
-      {
+        deserializer->jump(array_size);
+      } else {
         rapidjson::Value array_value(rapidjson::kArrayType);
 
         for (int i = 0; i < array_size; i++) {
@@ -381,14 +383,58 @@ bool Parser::deserializeIntoJson(
   return true;
 }
 
+namespace {
+template <typename T>
+T readJsonValue(rapidjson::Value* value_field, std::string_view field_name) {
+  if (!value_field) {
+    return T{};
+  }
+  if constexpr (std::is_unsigned_v<T> && std::is_integral_v<T>) {
+    if (!value_field->IsUint64()) {
+      throw std::runtime_error("Expected unsigned integer in field: " + std::string(field_name));
+    }
+    auto v = value_field->GetUint64();
+    if (v > std::numeric_limits<T>::max()) {
+      throw std::runtime_error("Value out of range in field: " + std::string(field_name));
+    }
+    return static_cast<T>(v);
+  } else if constexpr (std::is_signed_v<T> && std::is_integral_v<T>) {
+    if (!value_field->IsInt64()) {
+      throw std::runtime_error("Expected integer in field: " + std::string(field_name));
+    }
+    auto v = value_field->GetInt64();
+    if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+      throw std::runtime_error("Value out of range in field: " + std::string(field_name));
+    }
+    return static_cast<T>(v);
+  } else {
+    static_assert(std::is_floating_point_v<T>);
+    if (!value_field->IsNumber()) {
+      throw std::runtime_error("Expected number in field: " + std::string(field_name));
+    }
+    return static_cast<T>(value_field->GetDouble());
+  }
+}
+}  // namespace
+
 bool Parser::serializeFromJson(const std::string_view json_string, Serializer* serializer) const {
   rapidjson::Document json_document;
   json_document.Parse(json_string.data(), json_string.size());
+  if (json_document.HasParseError()) {
+    throw std::runtime_error("Failed to parse JSON input");
+  }
+  if (!json_document.IsObject()) {
+    throw std::runtime_error("JSON root must be an object");
+  }
   serializer->reset();
 
   std::function<void(const ROSMessage*, rapidjson::Value*)> serializeImpl;
 
   serializeImpl = [&](const ROSMessage* msg_node, rapidjson::Value* json_value) {
+    if (json_value && !json_value->IsObject()) {
+      throw std::runtime_error("Expected JSON object while serializing nested message");
+    }
+
     size_t index_s = 0;
     size_t index_m = 0;
 
@@ -399,94 +445,108 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
       const ROSType& field_type = field.type();
       const auto field_name = rapidjson::StringRef(field.name().data(), field.name().size());
 
-      const bool has_json_value = json_value && json_value->HasMember(field_name.s);
+      rapidjson::Value* field_json_value = nullptr;
+      if (json_value && json_value->HasMember(field_name.s)) {
+        field_json_value = &((*json_value)[field_name.s]);
+      }
+
+      const bool has_json_value = (field_json_value != nullptr);
       const bool is_array = field.isArray();
       const bool is_dynamic_array = is_array && field.arraySize() == -1;
       const bool is_fixed_array = is_array && field.arraySize() != -1;
 
-      // both must be array or not array
-      if (has_json_value && (is_array != (*json_value)[field_name.s].IsArray())) {
+      if (has_json_value && (is_array != field_json_value->IsArray())) {
         throw std::runtime_error(std::string("IsArray() mismatch in field: ") + field.name());
       }
 
       uint32_t array_size = field.arraySize();
       if (is_dynamic_array) {
-        // if not present in the JSON, we will add an array size of 0
-        array_size = has_json_value ? (*json_value)[field_name.s].GetArray().Size() : 0;
+        array_size = has_json_value ? static_cast<uint32_t>(field_json_value->GetArray().Size()) : 0;
         serializer->serializeUInt32(array_size);
       }
       if (has_json_value && is_fixed_array) {
-        auto actual_size = static_cast<uint32_t>((*json_value)[field_name.s].GetArray().Size());
+        auto actual_size = static_cast<uint32_t>(field_json_value->GetArray().Size());
         if (array_size != actual_size) {
           throw std::runtime_error(std::string("Fixed array size mismatch in field: ") + field.name());
         }
       }
 
       const auto type_id = field_type.typeID();
+      const auto fname = field.name();
 
       for (uint32_t i = 0; i < array_size; i++) {
-        // is !has_json_value , we will serialize a zero value
-        rapidjson::Value zero_value = rapidjson::Value(0);
-        rapidjson::Value* value_field = &zero_value;
-
+        rapidjson::Value* value_field = nullptr;
         if (has_json_value) {
-          value_field = is_array ? &((*json_value)[field_name.s].GetArray()[i]) : &((*json_value)[field_name.s]);
+          value_field = is_array ? &(field_json_value->GetArray()[i]) : field_json_value;
         }
 
         switch (type_id) {
-          case BOOL:
-            serializer->serialize(type_id, value_field->GetBool());
-            break;
-          case CHAR:
-            serializer->serialize(type_id, value_field->GetString()[0]);
-            break;
+          case BOOL: {
+            bool value = value_field ? value_field->GetBool() : false;
+            serializer->serialize(type_id, value);
+          } break;
+          case CHAR: {
+            char c = '\0';
+            if (value_field && value_field->IsString() && value_field->GetStringLength() > 0) {
+              c = value_field->GetString()[0];
+            }
+            serializer->serialize(type_id, c);
+          } break;
 
           case BYTE:
           case UINT8:
-            serializer->serialize(type_id, uint8_t(value_field->GetUint()));
+            serializer->serialize(type_id, readJsonValue<uint8_t>(value_field, fname));
             break;
           case UINT16:
-            serializer->serialize(type_id, uint16_t(value_field->GetUint()));
+            serializer->serialize(type_id, readJsonValue<uint16_t>(value_field, fname));
             break;
           case UINT32:
-            serializer->serialize(type_id, value_field->GetUint());
+            serializer->serialize(type_id, readJsonValue<uint32_t>(value_field, fname));
             break;
           case UINT64:
-            serializer->serialize(type_id, value_field->GetUint64());
-            break;
-
+            serializer->serialize(type_id, readJsonValue<uint64_t>(value_field, fname));
             break;
           case INT8:
-            serializer->serialize(type_id, int8_t(value_field->GetUint()));
+            serializer->serialize(type_id, readJsonValue<int8_t>(value_field, fname));
             break;
           case INT16:
-            serializer->serialize(type_id, int16_t(value_field->GetUint()));
+            serializer->serialize(type_id, readJsonValue<int16_t>(value_field, fname));
             break;
           case INT32:
-            serializer->serialize(type_id, value_field->GetInt());
+            serializer->serialize(type_id, readJsonValue<int32_t>(value_field, fname));
             break;
           case INT64:
-            serializer->serialize(type_id, value_field->GetInt64());
+            serializer->serialize(type_id, readJsonValue<int64_t>(value_field, fname));
             break;
-
           case FLOAT32:
-            serializer->serialize(type_id, value_field->GetFloat());
+            serializer->serialize(type_id, readJsonValue<float>(value_field, fname));
             break;
           case FLOAT64:
-            serializer->serialize(type_id, value_field->GetDouble());
+            serializer->serialize(type_id, readJsonValue<double>(value_field, fname));
             break;
 
           case DURATION:
           case TIME: {
-            uint32_t secs = value_field->GetObject()["secs"].GetInt();
-            serializer->serializeUInt32(secs);
-
-            uint32_t nsecs = value_field->GetObject()["nsecs"].GetInt();
-            serializer->serializeUInt32(nsecs);
+            int32_t secs = 0;
+            int32_t nsecs = 0;
+            if (value_field) {
+              if (!value_field->IsObject()) {
+                throw std::runtime_error(std::string("Expected time/duration object in field: ") + fname);
+              }
+              auto sec_it = value_field->FindMember("secs");
+              auto nsec_it = value_field->FindMember("nsecs");
+              if (sec_it == value_field->MemberEnd() || nsec_it == value_field->MemberEnd()) {
+                throw std::runtime_error(std::string("Missing secs/nsecs in field: ") + fname);
+              }
+              secs = readJsonValue<int32_t>(&sec_it->value, fname);
+              nsecs = readJsonValue<int32_t>(&nsec_it->value, fname);
+            }
+            serializer->serializeUInt32(static_cast<uint32_t>(secs));
+            serializer->serializeUInt32(static_cast<uint32_t>(nsecs));
           } break;
 
           case STRING: {
-            if (has_json_value) {
+            if (value_field) {
               const char* str = value_field->GetString();
               uint32_t len = value_field->GetStringLength();
               serializer->serializeString(std::string(str, len));
@@ -496,11 +556,10 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
           } break;
           case OTHER: {
             auto msg_node_child = field.getMessagePtr(_schema->msg_library);
-            if (!has_json_value) {
-              serializeImpl(msg_node_child.get(), nullptr);
-            } else {
-              serializeImpl(msg_node_child.get(), value_field);
+            if (!msg_node_child) {
+              throw std::runtime_error(std::string("Missing ROSType in library for field: ") + fname);
             }
+            serializeImpl(msg_node_child.get(), value_field);
           } break;
         }  // end switch
       }    // end for array
