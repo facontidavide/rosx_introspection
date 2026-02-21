@@ -2,8 +2,8 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+2.1.0 (2026-02-21)
+------------------
 * Fix multiple bugs in serialization, deserialization, and JSON handling
   - Fix missing throw in ROS_Deserializer::deserialize for unsupported types
   - Fix NanoCDR_Deserializer::deserializeByteSequence crash on empty sequences
