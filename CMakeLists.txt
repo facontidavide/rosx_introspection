@@ -82,6 +82,8 @@ if(BUILD_TESTING)
         find_package(geometry_msgs REQUIRED)
         find_package(ament_cmake_gtest REQUIRED)
 
+        set(TESTING_DEPENDENCIES sensor_msgs geometry_msgs)
+
         ament_add_gtest(rosx_introspection_test
             test/test_parser.cpp
             test/test_ros2.cpp )
@@ -111,7 +113,7 @@ endif(BUILD_TESTING)
 
 if(USING_ROS2)
     ament_export_targets(rosx_introspectionTargets HAS_LIBRARY_TARGET)
-    ament_export_dependencies(ament_index_cpp rosbag2_cpp)
+    ament_export_dependencies(ament_index_cpp rosbag2_cpp ${TESTING_DEPENDENCIES})
     ament_package()
 endif(USING_ROS2)
 
