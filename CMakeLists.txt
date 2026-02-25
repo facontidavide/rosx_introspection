@@ -46,10 +46,10 @@ target_include_directories(rosx_introspection PUBLIC
 target_compile_features(rosx_introspection PUBLIC cxx_std_17)
 
 if(USING_ROS2)
-    ament_target_dependencies(rosx_introspection
-        ament_index_cpp
-        rclcpp
-        rosbag2_cpp)
+    target_link_libraries(rosx_introspection
+        ament_index_cpp::ament_index_cpp
+        rclcpp::rclcpp
+        rosbag2_cpp::rosbag2_cpp)
 endif()
 
 if(ROSX_HAS_JSON)
@@ -81,8 +81,11 @@ if(BUILD_TESTING)
             test/test_parser.cpp
             test/test_ros2.cpp )
 
-        ament_target_dependencies(rosx_introspection_test sensor_msgs geometry_msgs)
-        target_link_libraries(rosx_introspection_test rosx_introspection)
+        target_link_libraries(rosx_introspection_test
+            rosx_introspection
+            ${sensor_msgs_TARGETS}
+            ${geometry_msgs_TARGETS}
+        )
 
         target_include_directories(rosx_introspection_test PUBLIC
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
