@@ -46,7 +46,7 @@ target_include_directories(rosx_introspection PUBLIC
 target_compile_features(rosx_introspection PUBLIC cxx_std_17)
 
 if(USING_ROS2)
-    target_link_libraries(rosx_introspection
+    target_link_libraries(rosx_introspection PUBLIC
         ament_index_cpp::ament_index_cpp
         rclcpp::rclcpp
         rosbag2_cpp::rosbag2_cpp)
