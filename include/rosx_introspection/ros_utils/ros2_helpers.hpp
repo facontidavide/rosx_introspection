@@ -57,7 +57,11 @@ inline std::vector<uint8_t> BuildMessageBuffer(const T& msg, const std::string& 
     throw std::runtime_error("Failed to load typesupport library");
   }
   auto typesupport =
+#ifdef ROS_HUMBLE
       rclcpp::get_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#else
+      rclcpp::get_message_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#endif
 
   RmwInterface rmw;
   auto serialized_msg = rmw.serialize_message(msg, typesupport);
@@ -77,7 +81,11 @@ inline T BufferToMessage(const void* bufferPtr, size_t bufferSize) {
     throw std::runtime_error("Failed to load typesupport library");
   }
   auto type_support =
+#ifdef ROS_HUMBLE
       rclcpp::get_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#else
+      rclcpp::get_message_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#endif
 
   rmw_serialized_message_t serialized_msg;
   serialized_msg.buffer_capacity = bufferSize;

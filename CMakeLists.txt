@@ -47,6 +47,10 @@ target_include_directories(rosx_introspection PUBLIC
 target_compile_features(rosx_introspection PUBLIC cxx_std_17)
 
 if(USING_ROS2)
+    message(STATUS "Detected ROS distro: $ENV{ROS_DISTRO}")
+    if("$ENV{ROS_DISTRO}" STREQUAL "humble")
+        target_compile_definitions(rosx_introspection PRIVATE ROS_HUMBLE)
+    endif()
     target_link_libraries(rosx_introspection PUBLIC
         ament_index_cpp::ament_index_cpp
         rclcpp::rclcpp
@@ -91,6 +95,10 @@ if(BUILD_TESTING)
         ament_add_gtest(rosx_introspection_test
             test/test_parser.cpp
             test/test_ros2.cpp )
+
+        if("$ENV{ROS_DISTRO}" STREQUAL "humble")
+            target_compile_definitions(rosx_introspection_test PRIVATE ROS_HUMBLE)
+        endif()
 
         target_link_libraries(rosx_introspection PUBLIC
             ${sensor_msgs_TARGETS}
