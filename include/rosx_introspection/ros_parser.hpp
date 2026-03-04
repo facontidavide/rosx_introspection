@@ -44,6 +44,9 @@ struct FlatMessage {
   std::vector<std::vector<uint8_t>> blob_storage;
 };
 
+/// Parser is NOT thread-safe. Each thread must use its own Parser instance,
+/// or external synchronization must be provided. Internal mutable state
+/// (buffers, caches) is reused across calls for performance.
 class Parser {
  public:
   /**
@@ -119,13 +122,14 @@ class Parser {
    * @return true if the entire message was parsed or false if parts of the message were
    *         skipped because an array has (size > max_array_size)
    */
-  bool deserialize(Span<const uint8_t> buffer, FlatMessage* flat_output, Deserializer* deserializer) const;
+  [[nodiscard]] bool deserialize(
+      Span<const uint8_t> buffer, FlatMessage& flat_output, Deserializer& deserializer) const;
 
-  bool deserializeIntoJson(
-      Span<const uint8_t> buffer, std::string* json_txt, Deserializer* deserializer, int indent = 0,
+  [[nodiscard]] bool deserializeIntoJson(
+      Span<const uint8_t> buffer, std::string& json_txt, Deserializer& deserializer, int indent = 0,
       bool ignore_constants = false) const;
 
-  bool serializeFromJson(const std::string_view json_string, Serializer* serializer) const;
+  [[nodiscard]] bool serializeFromJson(const std::string_view json_string, Serializer& serializer) const;
 
   typedef std::function<void(const ROSType&, Span<uint8_t>&)> VisitingCallback;
 
@@ -202,7 +206,7 @@ class ParsersCollection {
       CachedPack& pack = it->second;
       Parser& parser = pack.parser;
 
-      parser.deserialize(buffer, &pack.msg, _deserializer.get());
+      parser.deserialize(buffer, pack.msg, *_deserializer);
       return &pack.msg;
     }
     return nullptr;

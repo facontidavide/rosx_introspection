@@ -36,7 +36,7 @@ class Parser {
     // Create span from input data
     RosMsgParser::Span<const uint8_t> msg_span(reinterpret_cast<const uint8_t*>(raw_data.c_str()), raw_data.size());
 
-    if (!parser_.deserialize(msg_span, &flat_msg_, &deserializer_)) {
+    if (!parser_.deserialize(msg_span, flat_msg_, deserializer_)) {
       throw std::runtime_error("Failed to parse ROS message");
     }
 

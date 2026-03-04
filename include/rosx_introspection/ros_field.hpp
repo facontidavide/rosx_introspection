@@ -84,6 +84,9 @@ class ROSField {
 
   friend class ROSMessage;
 
+  /// Look up the ROSMessage for this field's type in the given library.
+  /// Note: uses an unsynchronized mutable cache internally. Not thread-safe
+  /// if the same ROSField is accessed from multiple threads concurrently.
   std::shared_ptr<ROSMessage> getMessagePtr(const RosMessageLibrary& library) const;
 
  protected:

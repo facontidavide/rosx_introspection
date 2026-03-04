@@ -21,9 +21,9 @@
  *   SOFTWARE.
  */
 
-#ifndef ROS_INTROSPECTION_ROSMESSAGE_H
-#define ROS_INTROSPECTION_ROSMESSAGE_H
+#pragma once
 
+#include <memory>
 #include <unordered_map>
 
 #include "rosx_introspection/ros_field.hpp"
@@ -74,6 +74,8 @@ struct MessageSchema {
   FieldTree field_tree;
   ROSMessage::Ptr root_msg;
   RosMessageLibrary msg_library;
+  /// Owns the root field that is stored as a raw pointer in field_tree
+  std::unique_ptr<ROSField> root_field;
 };
 
 //------------------------------------------------
@@ -93,5 +95,3 @@ std::vector<ROSMessage::Ptr> ParseMessageDefinitions(const std::string& multi_de
 MessageSchema::Ptr BuildMessageSchema(const std::string& topic_name, const std::vector<ROSMessage::Ptr>& parsed_msgs);
 
 }  // namespace RosMsgParser
-
-#endif

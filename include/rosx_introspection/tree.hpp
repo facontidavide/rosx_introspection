@@ -32,8 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  * *******************************************************************/
 
-#ifndef STRINGTREE_H
-#define STRINGTREE_H
+#pragma once
 
 #include <deque>
 #include <iostream>
@@ -221,5 +220,3 @@ inline const TreeNode<T>* Tree<T>::find(const Vect& concatenated_values, bool pa
 }  // namespace details
 
 }  // namespace RosMsgParser
-
-#endif  // STRINGTREE_H

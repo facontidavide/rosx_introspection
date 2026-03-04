@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(rosx_introspection LANGUAGES CXX VERSION 1.0.2)
+project(rosx_introspection LANGUAGES CXX VERSION 2.1.0)
 
 # create compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -29,7 +29,6 @@ endif()
 ## Declare a C++ library
 ###############################################
 add_library(rosx_introspection
-    ${SRC_FILES}
     src/ros_type.cpp
     src/ros_field.cpp
     src/stringtree_leaf.cpp
@@ -57,6 +56,13 @@ endif()
 if(ROSX_HAS_JSON)
     find_package(RapidJSON QUIET)
 
+    # Verify the found headers actually exist
+    if(RapidJSON_FOUND AND RapidJSON_INCLUDE_DIRS)
+        if(NOT EXISTS "${RapidJSON_INCLUDE_DIRS}/rapidjson/document.h")
+            set(RapidJSON_FOUND FALSE)
+        endif()
+    endif()
+
     if(NOT RapidJSON_FOUND)
         message(STATUS "Downloading RapidJSON with CPM")
         CPMAddPackage(NAME rapidjson
@@ -67,10 +73,12 @@ if(ROSX_HAS_JSON)
 
     target_compile_definitions(rosx_introspection PRIVATE ROSX_HAS_JSON)
     if(NOT USING_ROS2)
-        if(TARGET rapidjson)
-            target_link_libraries(rosx_introspection PRIVATE rapidjson)
-        elseif(RapidJSON_INCLUDE_DIRS)
+        if(RapidJSON_INCLUDE_DIRS)
             target_include_directories(rosx_introspection PRIVATE ${RapidJSON_INCLUDE_DIRS})
+        elseif(rapidjson_SOURCE_DIR)
+            target_include_directories(rosx_introspection PRIVATE ${rapidjson_SOURCE_DIR}/include)
+        elseif(TARGET rapidjson)
+            target_link_libraries(rosx_introspection PRIVATE rapidjson)
         endif()
     endif()
 
@@ -102,15 +110,29 @@ if(BUILD_TESTING)
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     endif(USING_ROS2)
 
-    find_package(GTest REQUIRED)
+    find_package(GTest QUIET)
+    if(NOT GTest_FOUND)
+        message(STATUS "Downloading GTest with CPM")
+        CPMAddPackage(NAME googletest
+            GIT_TAG v1.14.0
+            GITHUB_REPOSITORY "google/googletest"
+            OPTIONS "BUILD_GMOCK OFF" "INSTALL_GTEST OFF")
+    endif()
 
     add_executable(parser_test
             test/test_parser.cpp
             test/test_encoding.cpp)
 
-    target_link_libraries(parser_test rosx_introspection GTest::GTest GTest::Main)
+    if(TARGET GTest::gtest)
+        target_link_libraries(parser_test rosx_introspection GTest::gtest GTest::gtest_main)
+    else()
+        target_link_libraries(parser_test rosx_introspection GTest::GTest GTest::Main)
+    endif()
     target_include_directories(parser_test PUBLIC
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
+    include(GoogleTest)
+    gtest_discover_tests(parser_test)
 
 endif(BUILD_TESTING)
 
@@ -133,6 +155,15 @@ install(TARGETS rosx_introspection
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+
+###############################################
+## Benchmarks
+###############################################
+option(BUILD_BENCHMARKS "Build benchmark executables" OFF)
+if(BUILD_BENCHMARKS AND USING_ROS2)
+    add_executable(mcap_benchmark test/benchmark_mcap.cpp)
+    target_link_libraries(mcap_benchmark rosx_introspection)
+endif()
 
 # Python bindings
 if(ROSX_PYTHON_BINDINGS)

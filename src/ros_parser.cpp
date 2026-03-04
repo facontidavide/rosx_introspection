@@ -74,8 +74,8 @@ inline void ExpandVectorIfNecessary(Container& container, size_t new_size) {
   }
 }
 
-bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container, Deserializer* deserializer) const {
-  deserializer->init(buffer);
+bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage& flat_container, Deserializer& deserializer) const {
+  deserializer.init(buffer);
 
   bool entire_message_parse = true;
 
@@ -102,7 +102,7 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
 
       int32_t array_size = field.arraySize();
       if (array_size == -1) {
-        array_size = deserializer->deserializeUInt32();
+        array_size = deserializer.deserializeUInt32();
       }
       if (field.isArray()) {
         new_tree_leaf.index_array.push_back(0);
@@ -123,32 +123,32 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
       }
       // special case. This is a "blob", typically an image, a map, pointcloud, etc.
       if (IS_BLOB) {
-        ExpandVectorIfNecessary(flat_container->blob, blob_index);
+        ExpandVectorIfNecessary(flat_container.blob, blob_index);
 
-        if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
+        if (array_size > static_cast<int32_t>(deserializer.bytesLeft())) {
           throw std::runtime_error(
               "Buffer overrun in deserializeIntoFlatContainer "
               "(blob)");
         }
         if (DO_STORE) {
-          flat_container->blob[blob_index].first = FieldsVector(new_tree_leaf);
-          auto& blob = flat_container->blob[blob_index].second;
+          flat_container.blob[blob_index].first = FieldsVector(new_tree_leaf);
+          auto& blob = flat_container.blob[blob_index].second;
           blob_index++;
 
           if (_blob_policy == STORE_BLOB_AS_COPY) {
-            ExpandVectorIfNecessary(flat_container->blob_storage, blob_storage_index);
+            ExpandVectorIfNecessary(flat_container.blob_storage, blob_storage_index);
 
-            auto& storage = flat_container->blob_storage[blob_storage_index];
+            auto& storage = flat_container.blob_storage[blob_storage_index];
             storage.resize(array_size);
-            std::memcpy(storage.data(), deserializer->getCurrentPtr(), array_size);
+            std::memcpy(storage.data(), deserializer.getCurrentPtr(), array_size);
             blob_storage_index++;
 
             blob = Span<const uint8_t>(storage.data(), storage.size());
           } else {
-            blob = Span<const uint8_t>(deserializer->getCurrentPtr(), array_size);
+            blob = Span<const uint8_t>(deserializer.getCurrentPtr(), array_size);
           }
         }
-        deserializer->jump(array_size);
+        deserializer.jump(array_size);
       } else  // NOT a BLOB
       {
         bool DO_STORE_ARRAY = DO_STORE;
@@ -162,22 +162,22 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
           }
 
           if (field_type.typeID() == STRING) {
-            ExpandVectorIfNecessary(flat_container->value, value_index);
+            ExpandVectorIfNecessary(flat_container.value, value_index);
 
             std::string str;
-            deserializer->deserializeString(str);
+            deserializer.deserializeString(str);
 
             if (DO_STORE_ARRAY) {
-              flat_container->value[value_index].first = FieldsVector(new_tree_leaf);
-              flat_container->value[value_index].second = str;
+              flat_container.value[value_index].first = FieldsVector(new_tree_leaf);
+              flat_container.value[value_index].second = str;
               value_index++;
             }
           } else if (field_type.isBuiltin()) {
-            ExpandVectorIfNecessary(flat_container->value, value_index);
+            ExpandVectorIfNecessary(flat_container.value, value_index);
 
-            Variant var = deserializer->deserialize(field_type.typeID());
+            Variant var = deserializer.deserialize(field_type.typeID());
             if (DO_STORE_ARRAY) {
-              flat_container->value[value_index] = std::make_pair(new_tree_leaf, std::move(var));
+              flat_container.value[value_index] = std::make_pair(new_tree_leaf, std::move(var));
               value_index++;
             }
           } else {  // field_type.typeID() == OTHER
@@ -192,10 +192,10 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
       }
       index_s++;
     }  // end for fields
-  };   // end of lambda
+  };  // end of lambda
 
   // pass the shared_ptr
-  flat_container->schema = _schema;
+  flat_container.schema = _schema;
 
   FieldLeaf rootnode;
   rootnode.node = _schema->field_tree.croot();
@@ -203,30 +203,30 @@ bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container
 
   deserializeImpl(root_msg.get(), rootnode, true);
 
-  flat_container->value.resize(value_index);
-  flat_container->blob.resize(blob_index);
-  flat_container->blob_storage.resize(blob_storage_index);
+  flat_container.value.resize(value_index);
+  flat_container.blob.resize(blob_index);
+  flat_container.blob_storage.resize(blob_storage_index);
 
   return entire_message_parse;
 }
 
 #ifndef ROSX_HAS_JSON
 bool Parser::deserializeIntoJson(
-    Span<const uint8_t> buffer, std::string* json_txt, Deserializer* deserializer, int indent,
+    Span<const uint8_t> buffer, std::string& json_txt, Deserializer& deserializer, int indent,
     bool ignore_constants) const {
   throw std::runtime_error("This version of rosx_introspection was built without JSON support");
   return false;
 }
-bool Parser::serializeFromJson(const std::string_view json_string, Serializer* serializer) const {
+bool Parser::serializeFromJson(const std::string_view json_string, Serializer& serializer) const {
   throw std::runtime_error("This version of rosx_introspection was built without JSON support");
   return false;
 }
 
 #else
 bool Parser::deserializeIntoJson(
-    Span<const uint8_t> buffer, std::string* json_txt, Deserializer* deserializer, int indent,
+    Span<const uint8_t> buffer, std::string& json_txt, Deserializer& deserializer, int indent,
     bool ignore_constants) const {
-  deserializer->init(buffer);
+  deserializer.init(buffer);
 
   rapidjson::Document json_document;
   rapidjson::Document::AllocatorType& alloc = json_document.GetAllocator();
@@ -247,18 +247,17 @@ bool Parser::deserializeIntoJson(
 
       int32_t array_size = field.arraySize();
       if (array_size == -1) {
-        array_size = deserializer->deserializeUInt32();
+        array_size = deserializer.deserializeUInt32();
       }
 
-      const bool skip_large_byte_array =
-          field.isArray() && array_size > static_cast<int32_t>(_max_array_size) && field_type.isBuiltin() &&
-          builtinSize(field_type.typeID()) == 1;
+      const bool skip_large_byte_array = field.isArray() && array_size > static_cast<int32_t>(_max_array_size) &&
+                                         field_type.isBuiltin() && builtinSize(field_type.typeID()) == 1;
 
       if (skip_large_byte_array) {
-        if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
+        if (array_size > static_cast<int32_t>(deserializer.bytesLeft())) {
           throw std::runtime_error("Buffer overrun in blob");
         }
-        deserializer->jump(array_size);
+        deserializer.jump(array_size);
       } else {
         rapidjson::Value array_value(rapidjson::kArrayType);
 
@@ -268,38 +267,38 @@ bool Parser::deserializeIntoJson(
 
           switch (field_type.typeID()) {
             case BOOL:
-              new_value.SetBool(deserializer->deserialize(field_type.typeID()).convert<uint8_t>());
+              new_value.SetBool(deserializer.deserialize(field_type.typeID()).convert<uint8_t>());
               break;
             case CHAR: {
-              char c = deserializer->deserialize(field_type.typeID()).convert<int8_t>();
+              char c = deserializer.deserialize(field_type.typeID()).convert<int8_t>();
               new_value.SetString(&c, 1, alloc);
             } break;
             case BYTE:
             case UINT8:
             case UINT16:
             case UINT32:
-              new_value.SetUint((deserializer->deserialize(field_type.typeID()).convert<uint32_t>()));
+              new_value.SetUint((deserializer.deserialize(field_type.typeID()).convert<uint32_t>()));
               break;
             case UINT64:
-              new_value.SetUint64((deserializer->deserialize(field_type.typeID()).convert<uint64_t>()));
+              new_value.SetUint64((deserializer.deserialize(field_type.typeID()).convert<uint64_t>()));
               break;
             case INT8:
             case INT16:
             case INT32:
-              new_value.SetInt((deserializer->deserialize(field_type.typeID()).convert<int32_t>()));
+              new_value.SetInt((deserializer.deserialize(field_type.typeID()).convert<int32_t>()));
               break;
             case INT64:
-              new_value.SetInt64((deserializer->deserialize(field_type.typeID()).convert<int64_t>()));
+              new_value.SetInt64((deserializer.deserialize(field_type.typeID()).convert<int64_t>()));
               break;
             case FLOAT32:
-              new_value.SetFloat((deserializer->deserialize(field_type.typeID()).convert<float>()));
+              new_value.SetFloat((deserializer.deserialize(field_type.typeID()).convert<float>()));
               break;
             case FLOAT64:
-              new_value.SetDouble((deserializer->deserialize(field_type.typeID()).convert<double>()));
+              new_value.SetDouble((deserializer.deserialize(field_type.typeID()).convert<double>()));
               break;
             case TIME: {
-              int sec = deserializer->deserialize(INT32).convert<int32_t>();
-              int nsec = deserializer->deserialize(INT32).convert<int32_t>();
+              int sec = deserializer.deserialize(INT32).convert<int32_t>();
+              int nsec = deserializer.deserialize(INT32).convert<int32_t>();
               rapidjson::Value sec_Value;
               sec_Value.SetObject();
               sec_Value.SetInt(sec);
@@ -311,8 +310,8 @@ bool Parser::deserializeIntoJson(
               new_value.AddMember("nsecs", nsec_value, alloc);
             } break;
             case DURATION: {
-              int sec = deserializer->deserialize(INT32).convert<int32_t>();
-              int nsec = deserializer->deserialize(INT32).convert<int32_t>();
+              int sec = deserializer.deserialize(INT32).convert<int32_t>();
+              int nsec = deserializer.deserialize(INT32).convert<int32_t>();
               rapidjson::Value sec_Value;
               sec_Value.SetObject();
               sec_Value.SetInt(sec);
@@ -326,7 +325,7 @@ bool Parser::deserializeIntoJson(
 
             case STRING: {
               std::string s;
-              deserializer->deserializeString(s);
+              deserializer.deserializeString(s);
               new_value.SetString(s.c_str(), s.length(), alloc);
             } break;
             case OTHER: {
@@ -352,7 +351,7 @@ bool Parser::deserializeIntoJson(
       }
       index_s++;
     }  // end for fields
-  };   // end of lambda
+  };  // end of lambda
 
   FieldLeaf rootnode;
   rootnode.node = _schema->field_tree.croot();
@@ -361,7 +360,7 @@ bool Parser::deserializeIntoJson(
   rapidjson::Value& json_node = json_document.SetObject();
   deserializeImpl(root_msg.get(), json_node);
 
-  static rapidjson::StringBuffer json_buffer;
+  thread_local rapidjson::StringBuffer json_buffer;
   json_buffer.Reserve(65536);
   json_buffer.Clear();
 
@@ -372,12 +371,12 @@ bool Parser::deserializeIntoJson(
         json_writer(json_buffer);
     json_document.Accept(json_writer);
 
-    *json_txt = json_buffer.GetString();
+    json_txt = json_buffer.GetString();
   } else {
     rapidjson::PrettyWriter<rapidjson::StringBuffer> json_writer(json_buffer);
     json_writer.SetIndent(' ', indent);
     json_document.Accept(json_writer);
-    *json_txt = json_buffer.GetString();
+    json_txt = json_buffer.GetString();
   }
 
   return true;
@@ -417,7 +416,7 @@ T readJsonValue(rapidjson::Value* value_field, std::string_view field_name) {
 }
 }  // namespace
 
-bool Parser::serializeFromJson(const std::string_view json_string, Serializer* serializer) const {
+bool Parser::serializeFromJson(const std::string_view json_string, Serializer& serializer) const {
   rapidjson::Document json_document;
   json_document.Parse(json_string.data(), json_string.size());
   if (json_document.HasParseError()) {
@@ -426,7 +425,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
   if (!json_document.IsObject()) {
     throw std::runtime_error("JSON root must be an object");
   }
-  serializer->reset();
+  serializer.reset();
 
   std::function<void(const ROSMessage*, rapidjson::Value*)> serializeImpl;
 
@@ -462,7 +461,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
       uint32_t array_size = field.arraySize();
       if (is_dynamic_array) {
         array_size = has_json_value ? static_cast<uint32_t>(field_json_value->GetArray().Size()) : 0;
-        serializer->serializeUInt32(array_size);
+        serializer.serializeUInt32(array_size);
       }
       if (has_json_value && is_fixed_array) {
         auto actual_size = static_cast<uint32_t>(field_json_value->GetArray().Size());
@@ -483,46 +482,46 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
         switch (type_id) {
           case BOOL: {
             bool value = value_field ? value_field->GetBool() : false;
-            serializer->serialize(type_id, value);
+            serializer.serialize(type_id, value);
           } break;
           case CHAR: {
             char c = '\0';
             if (value_field && value_field->IsString() && value_field->GetStringLength() > 0) {
               c = value_field->GetString()[0];
             }
-            serializer->serialize(type_id, c);
+            serializer.serialize(type_id, c);
           } break;
 
           case BYTE:
           case UINT8:
-            serializer->serialize(type_id, readJsonValue<uint8_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<uint8_t>(value_field, fname));
             break;
           case UINT16:
-            serializer->serialize(type_id, readJsonValue<uint16_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<uint16_t>(value_field, fname));
             break;
           case UINT32:
-            serializer->serialize(type_id, readJsonValue<uint32_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<uint32_t>(value_field, fname));
             break;
           case UINT64:
-            serializer->serialize(type_id, readJsonValue<uint64_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<uint64_t>(value_field, fname));
             break;
           case INT8:
-            serializer->serialize(type_id, readJsonValue<int8_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<int8_t>(value_field, fname));
             break;
           case INT16:
-            serializer->serialize(type_id, readJsonValue<int16_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<int16_t>(value_field, fname));
             break;
           case INT32:
-            serializer->serialize(type_id, readJsonValue<int32_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<int32_t>(value_field, fname));
             break;
           case INT64:
-            serializer->serialize(type_id, readJsonValue<int64_t>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<int64_t>(value_field, fname));
             break;
           case FLOAT32:
-            serializer->serialize(type_id, readJsonValue<float>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<float>(value_field, fname));
             break;
           case FLOAT64:
-            serializer->serialize(type_id, readJsonValue<double>(value_field, fname));
+            serializer.serialize(type_id, readJsonValue<double>(value_field, fname));
             break;
 
           case DURATION:
@@ -541,17 +540,17 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
               secs = readJsonValue<int32_t>(&sec_it->value, fname);
               nsecs = readJsonValue<int32_t>(&nsec_it->value, fname);
             }
-            serializer->serializeUInt32(static_cast<uint32_t>(secs));
-            serializer->serializeUInt32(static_cast<uint32_t>(nsecs));
+            serializer.serializeUInt32(static_cast<uint32_t>(secs));
+            serializer.serializeUInt32(static_cast<uint32_t>(nsecs));
           } break;
 
           case STRING: {
             if (value_field) {
               const char* str = value_field->GetString();
               uint32_t len = value_field->GetStringLength();
-              serializer->serializeString(std::string(str, len));
+              serializer.serializeString(std::string(str, len));
             } else {
-              serializer->serializeString("");
+              serializer.serializeString("");
             }
           } break;
           case OTHER: {
@@ -562,14 +561,14 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
             serializeImpl(msg_node_child.get(), value_field);
           } break;
         }  // end switch
-      }    // end for array
+      }  // end for array
 
       if (field_type.typeID() == OTHER) {
         index_m++;
       }
       index_s++;
     }  // end for fields
-  };   // end of lambda
+  };  // end of lambda
 
   auto root_msg = _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 

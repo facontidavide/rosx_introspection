@@ -1,5 +1,4 @@
-#ifndef DESERIALIZER_HPP
-#define DESERIALIZER_HPP
+#pragma once
 
 // API adapted to FastCDR
 
@@ -122,5 +121,3 @@ class NanoCDR_Deserializer : public Deserializer {
 using ROS2_Deserializer = NanoCDR_Deserializer;
 
 }  // namespace RosMsgParser
-
-#endif  // DESERIALIZER_HPP

@@ -141,13 +141,13 @@ TEST(ParseROS2, JointState_JSON) {
   std::vector<uint8_t> buffer_in = BuildMessageBuffer(joint_state, topic_type);
 
   std::string json_text;
-  parser.deserializeIntoJson(buffer_in, &json_text, &deserializer);
+  parser.deserializeIntoJson(buffer_in, json_text, deserializer);
 
   std::cout << "\n JSON encoding [joint_state]:\n" << json_text << std::endl;
 
   // test round-robin transform
   ROS2_Serializer serializer;
-  parser.serializeFromJson(json_text, &serializer);
+  parser.serializeFromJson(json_text, serializer);
 
   auto joint_state_out =
       BufferToMessage<sensor_msgs::msg::JointState>(serializer.getBufferData(), serializer.getBufferSize());
@@ -177,7 +177,7 @@ TEST(ParseROS2, JointState_JSON_Omitted) {
 
   // We omitted the effort field and the header.frame_id
   ROS2_Serializer serializer;
-  parser.serializeFromJson(joint_state_json, &serializer);
+  parser.serializeFromJson(joint_state_json, serializer);
 
   auto joint_state_out =
       BufferToMessage<sensor_msgs::msg::JointState>(serializer.getBufferData(), serializer.getBufferSize());
@@ -223,13 +223,13 @@ TEST(ParseROS2, PoseStamped_JSON) {
   std::vector<uint8_t> buffer_in = BuildMessageBuffer(pose_stamped, topic_type);
 
   std::string json_text;
-  parser.deserializeIntoJson(buffer_in, &json_text, &deserializer);
+  parser.deserializeIntoJson(buffer_in, json_text, deserializer);
 
   std::cout << "\n JSON encoding [pose_stamped]:\n" << json_text << std::endl;
 
   // test round-robin transform
   ROS2_Serializer serializer;
-  parser.serializeFromJson(json_text, &serializer);
+  parser.serializeFromJson(json_text, serializer);
 
   auto pose_stamped_out =
       BufferToMessage<geometry_msgs::msg::PoseStamped>(serializer.getBufferData(), serializer.getBufferSize());
@@ -259,7 +259,7 @@ TEST(ParseROS2, PoseStamped_JSON_Omitted) {
 
   // We omitted the effort field and the header.frame_id
   ROS2_Serializer serializer;
-  parser.serializeFromJson(pose_stamped_json, &serializer);
+  parser.serializeFromJson(pose_stamped_json, serializer);
 
   auto pose_stamped_out =
       BufferToMessage<geometry_msgs::msg::PoseStamped>(serializer.getBufferData(), serializer.getBufferSize());
@@ -287,7 +287,7 @@ TEST(ParseROS2, Duration) {
 
   // We omitted the effort field and the header.frame_id
   ROS2_Serializer serializer;
-  parser.serializeFromJson(durationA_json, &serializer);
+  parser.serializeFromJson(durationA_json, serializer);
 
   auto durationA =
       BufferToMessage<builtin_interfaces::msg::Duration>(serializer.getBufferData(), serializer.getBufferSize());
@@ -297,7 +297,7 @@ TEST(ParseROS2, Duration) {
   //------------------------------
   const char* durationB_json = R"({"sec":1,"nanosec":234})";
   serializer.reset();
-  parser.serializeFromJson(durationB_json, &serializer);
+  parser.serializeFromJson(durationB_json, serializer);
 
   auto durationB =
       BufferToMessage<builtin_interfaces::msg::Duration>(serializer.getBufferData(), serializer.getBufferSize());

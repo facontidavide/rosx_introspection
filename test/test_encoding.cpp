@@ -20,9 +20,8 @@ bool HasJsonSupport() {
   std::string json;
   try {
     return parser.deserializeIntoJson(
-        Span<const uint8_t>(
-            reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
-        &json, &deserializer);
+        Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+        json, deserializer);
   } catch (const std::runtime_error& ex) {
     if (std::string(ex.what()).find("without JSON support") != std::string::npos) {
       return false;
@@ -187,7 +186,7 @@ TEST(ParserJson, LargeArrayShouldNotCorruptFollowingFields) {
   std::string json;
   ASSERT_TRUE(parser.deserializeIntoJson(
       Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
-      &json, &deserializer));
+      json, deserializer));
 
   EXPECT_NE(json.find("\"tail\":42"), std::string::npos);
 }
@@ -208,7 +207,7 @@ TEST(ParserFlatMessage, LargeUint8ArrayShouldBeBlob) {
   NanoCDR_Deserializer deserializer;
   ASSERT_TRUE(parser.deserialize(
       Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
-      &flat, &deserializer));
+      flat, deserializer));
 
   EXPECT_EQ(flat.blob.size(), 1u);
   EXPECT_EQ(flat.value.size(), 0u);
@@ -223,7 +222,7 @@ TEST(ParserJson, NegativeInt8ShouldNotAbort) {
       {
         Parser parser("topic", ROSType("my_pkg/Test"), "int8 value\n");
         NanoCDR_Serializer serializer;
-        parser.serializeFromJson(R"({"value":-1})", &serializer);
+        (void)parser.serializeFromJson(R"({"value":-1})", serializer);
 
         NanoCDR_Deserializer deserializer;
         deserializer.init(Span<const uint8_t>(
@@ -246,7 +245,7 @@ TEST(ParserJson, OmittedBoolShouldDefaultToFalse) {
       {
         Parser parser("topic", ROSType("my_pkg/Test"), "bool flag\n");
         NanoCDR_Serializer serializer;
-        parser.serializeFromJson("{}", &serializer);
+        (void)parser.serializeFromJson("{}", serializer);
 
         NanoCDR_Deserializer deserializer;
         deserializer.init(Span<const uint8_t>(
@@ -270,7 +269,7 @@ TEST(ParserJson, MalformedJsonShouldNotAbort) {
         Parser parser("topic", ROSType("my_pkg/Test"), "uint32 value\n");
         NanoCDR_Serializer serializer;
         try {
-          parser.serializeFromJson("{", &serializer);
+          (void)parser.serializeFromJson("{", serializer);
         } catch (...) {
           std::_Exit(0);
         }
@@ -304,4 +303,56 @@ TEST(ROSDeserializer, UnsupportedTypeShouldThrow) {
   deserializer.init(Span<const uint8_t>(buffer.data(), buffer.size()));
 
   EXPECT_THROW(deserializer.deserialize(OTHER), std::runtime_error);
+}
+
+TEST(ParserFlatMessage, TruncatedBufferShouldThrow) {
+  Parser parser("topic", ROSType("my_pkg/Test"), "float64 x\nfloat64 y\nfloat64 z\n");
+
+  // Buffer with only 8 bytes (enough for 1 float64, but message needs 3)
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(FLOAT64, Variant(double(1.0)));
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  EXPECT_THROW(
+      (void)parser.deserialize(
+          Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+          flat, deserializer),
+      std::runtime_error);
+}
+
+TEST(ParserFlatMessage, BlobSizeExceedingBufferShouldThrow) {
+  Parser parser("topic", ROSType("my_pkg/Test"), "uint8[] data\n");
+  parser.setMaxArrayPolicy(Parser::DISCARD_LARGE_ARRAYS, 100);
+  parser.setBlobPolicy(Parser::STORE_BLOB_AS_COPY);
+
+  // Serialize an array header claiming 1000 bytes but only provide 10
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(1000);
+  for (int i = 0; i < 10; i++) {
+    serializer.serialize(UINT8, Variant(uint8_t(i)));
+  }
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  EXPECT_THROW(
+      (void)parser.deserialize(
+          Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+          flat, deserializer),
+      std::runtime_error);
+}
+
+TEST(ParserFlatMessage, EmptyMessageDefinition) {
+  // A message with no fields should parse an empty buffer successfully.
+  // Uses ROS_Deserializer since NanoCDR requires a CDR encoding header.
+  Parser parser("topic", ROSType("my_pkg/Empty"), "\n");
+
+  uint8_t dummy = 0;
+  FlatMessage flat;
+  ROS_Deserializer deserializer;
+  EXPECT_TRUE(parser.deserialize(Span<const uint8_t>(&dummy, 0), flat, deserializer));
+  EXPECT_EQ(flat.value.size(), 0u);
+  EXPECT_EQ(flat.blob.size(), 0u);
 }
