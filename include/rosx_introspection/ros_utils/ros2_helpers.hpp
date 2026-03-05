@@ -1,6 +1,7 @@
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/version.h>
 #include <rosbag2_cpp/types/introspection_message.hpp>
 #include <rclcpp/typesupport_helpers.hpp>
 #include <rosidl_typesupport_cpp/identifier.hpp>
@@ -56,8 +57,13 @@ inline std::vector<uint8_t> BuildMessageBuffer(const T& msg, const std::string& 
   {
     throw std::runtime_error("Failed to load typesupport library");
   }
+#if RCLCPP_VERSION_GTE(25, 0, 0)
+  auto typesupport =
+      rclcpp::get_message_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#else
   auto typesupport =
       rclcpp::get_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#endif
 
   RmwInterface rmw;
   auto serialized_msg = rmw.serialize_message(msg, typesupport);
@@ -76,8 +82,13 @@ inline T BufferToMessage(const void* bufferPtr, size_t bufferSize) {
   {
     throw std::runtime_error("Failed to load typesupport library");
   }
+#if RCLCPP_VERSION_GTE(25, 0, 0)
+  auto type_support =
+      rclcpp::get_message_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#else
   auto type_support =
       rclcpp::get_typesupport_handle(topic_type, ts_identifier, *ts_library);
+#endif
 
   rmw_serialized_message_t serialized_msg;
   serialized_msg.buffer_capacity = bufferSize;
