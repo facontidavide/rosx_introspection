@@ -31,9 +31,7 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  * *******************************************************************/
-
-#ifndef VARIANT_H
-#define VARIANT_H
+#pragma once
 
 #include <string.h>
 
@@ -374,4 +372,3 @@ inline std::string Variant::convert() const {
 
 }  // namespace RosMsgParser
 
-#endif  // VARIANT_H

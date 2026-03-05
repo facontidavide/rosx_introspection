@@ -352,7 +352,7 @@ bool Parser::deserializeIntoJson(
       }
       index_s++;
     }  // end for fields
-  };   // end of lambda
+  };  // end of lambda
 
   FieldLeaf rootnode;
   rootnode.node = _schema->field_tree.croot();
@@ -361,7 +361,7 @@ bool Parser::deserializeIntoJson(
   rapidjson::Value& json_node = json_document.SetObject();
   deserializeImpl(root_msg.get(), json_node);
 
-  static rapidjson::StringBuffer json_buffer;
+  thread_local rapidjson::StringBuffer json_buffer;
   json_buffer.Reserve(65536);
   json_buffer.Clear();
 
@@ -562,14 +562,14 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
             serializeImpl(msg_node_child.get(), value_field);
           } break;
         }  // end switch
-      }    // end for array
+      }  // end for array
 
       if (field_type.typeID() == OTHER) {
         index_m++;
       }
       index_s++;
     }  // end for fields
-  };   // end of lambda
+  };  // end of lambda
 
   auto root_msg = _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 

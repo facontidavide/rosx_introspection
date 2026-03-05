@@ -68,13 +68,12 @@ void convertToMsgpack(const FlatMessage& flat_msg, std::vector<uint8_t>& msgpack
     }
   };
 
-  std::string key_str;
-
   // Write numerical values as key-value pairs
+  std::string key_buf;
   for (const auto& [key, num_value] : flat_msg.value) {
-    key.toStr(key_str);
-    resize_if_needed(5 + key_str.size() + 9);  // max key header + key + max value size
-    offset += msgpack::pack_string(msgpack_data.data() + offset, key_str);
+    key.toStr(key_buf);
+    resize_if_needed(5 + key_buf.size() + 9);  // max key header + key + max value size
+    offset += msgpack::pack_string(msgpack_data.data() + offset, key_buf);
     offset += pack_variant(num_value, msgpack_data.data() + offset);
   }
 

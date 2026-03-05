@@ -111,9 +111,18 @@ if(BUILD_TESTING)
     target_link_libraries(parser_test rosx_introspection GTest::GTest GTest::Main)
     target_include_directories(parser_test PUBLIC
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+    add_test(NAME parser_test COMMAND parser_test)
 
 endif(BUILD_TESTING)
 
+###############################################
+## Benchmarks
+###############################################
+option(BUILD_BENCHMARKS "Build benchmark executables" OFF)
+if(BUILD_BENCHMARKS AND USING_ROS2)
+    add_executable(mcap_benchmark test/benchmark_mcap.cpp)
+    target_link_libraries(mcap_benchmark rosx_introspection)
+endif()
 
 if(USING_ROS2)
     ament_export_targets(rosx_introspectionTargets HAS_LIBRARY_TARGET)

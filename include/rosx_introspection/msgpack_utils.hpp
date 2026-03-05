@@ -22,8 +22,8 @@
  */
 #pragma once
 
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 #include "rosx_introspection/ros_parser.hpp"
 
@@ -31,15 +31,15 @@ namespace RosMsgParser {
 
 /**
  * @brief Convert a FlatMessage to MessagePack format
- * 
+ *
  * This function serializes a parsed ROS message (FlatMessage) into MessagePack binary format.
  * The FlatMessage contains key-value pairs where keys are field paths and values are variants
  * representing the actual field values.
- * 
+ *
  * The MessagePack output is a map where:
  * - Keys are string field paths (e.g., "header.stamp.sec")
  * - Values are the corresponding field values encoded according to their type
- * 
+ *
  * @param flat_msg The parsed ROS message to convert
  * @param msgpack_data Output buffer that will be filled with MessagePack binary data.
  *                     The buffer is cleared and resized as needed.

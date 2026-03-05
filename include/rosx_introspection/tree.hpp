@@ -32,8 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  * *******************************************************************/
 
-#ifndef STRINGTREE_H
-#define STRINGTREE_H
+#pragma once
 
 #include <deque>
 #include <iostream>
@@ -88,10 +87,18 @@ class TreeNode {
     return _children.empty();
   }
 
+  uint32_t nodeId() const {
+    return _node_id;
+  }
+  void setNodeId(uint32_t id) {
+    _node_id = id;
+  }
+
  private:
   const TreeNode* _parent = nullptr;
   T _value;
   ChildrenVector _children;
+  uint32_t _node_id = 0;
 };
 
 template <typename T>
@@ -222,4 +229,3 @@ inline const TreeNode<T>* Tree<T>::find(const Vect& concatenated_values, bool pa
 
 }  // namespace RosMsgParser
 
-#endif  // STRINGTREE_H
