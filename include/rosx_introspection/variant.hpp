@@ -35,6 +35,7 @@
 
 #include <string.h>
 
+#include <array>
 #include <limits>
 #include <string_view>
 #include <type_traits>
