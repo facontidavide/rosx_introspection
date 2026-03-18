@@ -25,6 +25,8 @@
 #include <unordered_set>
 
 #include "rosx_introspection/deserializer.hpp"
+#include "rosx_introspection/idl_parser.hpp"
+#include "rosx_introspection/schema_writer.hpp"
 #include "rosx_introspection/serializer.hpp"
 #include "rosx_introspection/stringtree_leaf.hpp"
 
@@ -44,18 +46,18 @@ struct FlatMessage {
   std::vector<std::vector<uint8_t>> blob_storage;
 };
 
+enum SchemaFormat { ROS_MSG, DDS_IDL };
+
 class Parser {
  public:
   /**
-   *
    * @param topic_name   name of the topic to be used as node of the StringTree
    * @param msg_type     message type of the topic.
-   * @param msg_definition text obtained by either:
-   *                       - topic_tools::ShapeShifter::getMessageDefinition()
-   *                       - rosbag::MessageInstance::getMessageDefinition()
-   *                       - ros::message_traits::Definition< __your_type__ >::value()
-   * */
-  Parser(const std::string& topic_name, const ROSType& msg_type, const std::string& definition);
+   * @param definition   schema text (ROS .msg or DDS IDL)
+   * @param format       schema format: ROS_MSG (default) or DDS_IDL
+   */
+  Parser(const std::string& topic_name, const ROSType& msg_type, const std::string& definition,
+         SchemaFormat format = ROS_MSG);
 
   enum MaxArrayPolicy : bool { DISCARD_LARGE_ARRAYS = true, KEEP_LARGE_ARRAYS = false };
 
@@ -146,6 +148,10 @@ class Parser {
    */
   void applyVisitorToBuffer(const ROSType& msg_type, Span<uint8_t>& buffer, VisitingCallback callback) const;
 
+  /// Walk the schema and write deserialized values to a SchemaWriter.
+  /// This is the unified deserialization path used by deserialize() and deserializeIntoJson().
+  bool walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, SchemaWriter* writer) const;
+
   /// Change where the warning messages are displayed.
   void setWarningsStream(std::ostream* output) {
     _global_warnings = output;
@@ -191,9 +197,10 @@ class ParsersCollection {
     _deserializer = std::make_unique<DeserializerT>();
   }
 
-  void registerParser(const std::string& topic_name, const ROSType& msg_type, const std::string& definition) {
+  void registerParser(const std::string& topic_name, const ROSType& msg_type, const std::string& definition,
+                      SchemaFormat format = ROS_MSG) {
     if (_pack.count(topic_name) == 0) {
-      Parser parser(topic_name, msg_type, definition);
+      Parser parser(topic_name, msg_type, definition, format);
       CachedPack pack = {std::move(parser), {}};
       _pack.insert({topic_name, std::move(pack)});
     }

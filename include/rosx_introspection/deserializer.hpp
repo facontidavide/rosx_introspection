@@ -41,6 +41,12 @@ class Deserializer {
     return _buffer.size() - (getCurrentPtr() - _buffer.data());
   }
 
+  /// Check if an optional member is present in the CDR stream.
+  /// Default: always present (for ROS messages which don't have optional fields).
+  [[nodiscard]] virtual bool hasOptionalMember() {
+    return true;
+  }
+
   // reset the pointer to beginning of buffer
   virtual void reset() = 0;
 
@@ -110,6 +116,10 @@ class NanoCDR_Deserializer : public Deserializer {
 
   bool isROS2() const override {
     return true;
+  }
+
+  bool hasOptionalMember() override {
+    return _cdr_decoder->hasMember();
   }
 
  protected:

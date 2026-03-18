@@ -26,6 +26,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "rosx_introspection/idl_types.hpp"
 #include "rosx_introspection/ros_field.hpp"
 #include "rosx_introspection/tree.hpp"
 
@@ -76,6 +77,11 @@ struct MessageSchema {
   RosMessageLibrary msg_library;
   /// Owns the root field that is stored as a raw pointer in field_tree
   std::unique_ptr<ROSField> root_field;
+
+  // IDL type registries (empty for ROS .msg schemas)
+  std::unordered_map<ROSType, EnumDefinition> enum_library;
+  std::unordered_map<ROSType, DiscriminatedUnion> union_library;
+  std::unordered_map<ROSType, TypedefAlias> typedef_library;
 };
 
 //------------------------------------------------

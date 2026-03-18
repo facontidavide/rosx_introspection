@@ -27,6 +27,7 @@ namespace RosMsgParser {
 
 FieldsVector::FieldsVector(const FieldLeaf& leaf) : _node(leaf.node) {
   index_array = leaf.index_array;
+  key_suffix = leaf.key_suffix;
 }
 
 void FieldsVector::toStr(std::string& out) const {
@@ -38,12 +39,12 @@ void FieldsVector::toStr(std::string& out) const {
   const auto& tmpl = _node->cachedPath();
   const uint8_t num_brackets = _node->bracketCount();
 
-  if (num_brackets == 0) {
+  if (num_brackets == 0 && key_suffix.empty()) {
     out = tmpl;
     return;
   }
 
-  size_t extra = num_brackets * 5;
+  size_t extra = num_brackets * 5 + key_suffix.size();
   out.resize(tmpl.size() + extra);
   char* buf = out.data();
   const char* src = tmpl.data();
@@ -69,6 +70,11 @@ void FieldsVector::toStr(std::string& out) const {
   if (tail_len > 0) {
     std::memcpy(buf + out_off, src + src_off, tail_len);
     out_off += tail_len;
+  }
+
+  if (!key_suffix.empty()) {
+    std::memcpy(buf + out_off, key_suffix.data(), key_suffix.size());
+    out_off += key_suffix.size();
   }
 
   out.resize(out_off);

@@ -133,10 +133,22 @@ inline std::ostream& operator<<(std::ostream& os, const ROSType& t) {
 
 inline BuiltinType toBuiltinType(const std::string_view& s) {
   static std::map<std::string_view, BuiltinType> string_to_builtin_map{
+      // ROS type names
       {"bool", BOOL},       {"byte", BYTE},     {"char", CHAR},         {"uint8", UINT8},
       {"uint16", UINT16},   {"uint32", UINT32}, {"uint64", UINT64},     {"int8", INT8},
       {"int16", INT16},     {"int32", INT32},   {"int64", INT64},       {"float32", FLOAT32},
       {"float64", FLOAT64}, {"time", TIME},     {"duration", DURATION}, {"string", STRING},
+      // DDS/IDL type names
+      {"boolean", BOOL},
+      {"octet", UINT8},
+      {"short", INT16},
+      {"long", INT32},
+      {"long long", INT64},
+      {"unsigned short", UINT16},
+      {"unsigned long", UINT32},
+      {"unsigned long long", UINT64},
+      {"float", FLOAT32},
+      {"double", FLOAT64},
   };
   const auto it = string_to_builtin_map.find(s);
   return (it != string_to_builtin_map.cend()) ? it->second : OTHER;

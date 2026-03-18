@@ -1,0 +1,151 @@
+module AsensusMessaging {
+    typedef unsigned long long ArmIDType;
+};
+
+module ims_msgs {
+    enum MotorName {
+        J1,
+        J2,
+        J3,
+        J4,
+        J5,
+        J6,
+        J7,
+        IDS1,
+        IDS2,
+        IDS3,
+        IDS4,
+        IDSOpenClose
+    };
+};
+
+module ims_msgs {
+    struct MotorFeedback {
+        @key ims_msgs::MotorName MotorName;
+        float CurrentActual;
+        float TorqueActual;
+        float ValueCommanded;
+        float PositionActual;
+        float VelocityActual;
+        float PositionFollowingError;
+        boolean IsPowerEnabled;
+        boolean IsOnline;
+        boolean MoveComplete;
+        octet OperationMode;
+        unsigned short StatusWord;
+        unsigned short ControlWord;
+    };
+};
+
+module ims_msgs {
+    enum JointName {
+        J1,
+        J2,
+        J3,
+        J4,
+        J5,
+        J6,
+        J7,
+        IDS1,
+        IDS2,
+        IDS3,
+        IDS4,
+        IDSOpenClose
+    };
+};
+
+module ims_msgs {
+    enum ForceSensorStatusWord {
+        @value(1) Force_Status_Ok,
+        Force_Status_Error,
+        Force_Status_Initializing,
+        Force_Status_Calibrating,
+        Force_Status_Data_Update_Fail,
+        Force_Status_Command_Send_Fail,
+        @value(17) Force_Status_Invalid_Data_IDS1,
+        Force_Status_Invalid_Data_IDS2,
+        @value(20) Force_Status_Invalid_Data_IDS3,
+        @value(24) Force_Status_Invalid_Data_IDS4,
+        @value(32) Force_Filter_Set_Output_None,
+        Force_Filter_Set_Output_IDS1_Ok,
+        Force_Filter_Set_Output_IDS2_Ok,
+        @value(36) Force_Filter_Set_Output_IDS3_Ok,
+        @value(40) Force_Filter_Set_Output_IDS4_Ok,
+        @value(47) Force_Filter_Set_Output_All_Ok,
+        @value(64) Force_Taring_Output_None,
+        Force_Taring_Output_IDS1_Ok,
+        Force_Taring_Output_IDS2_Ok,
+        @value(68) Force_Taring_Output_IDS3_Ok,
+        @value(72) Force_Taring_Output_IDS4_Ok,
+        @value(79) Force_Taring_Output_All_Ok
+    };
+};
+
+module ims_msgs {
+    enum DeviceIOErrorCode {
+        NoError,
+        HardwareError,
+        StaleSample,
+        StaleData,
+        DataOutOfRange,
+        SensingRangeExceeded
+    };
+};
+
+module ims_msgs {
+    struct ForceSensorInputs {
+        double ForceActual;
+        ims_msgs::ForceSensorStatusWord StatusWord;
+        ims_msgs::DeviceIOErrorCode ErrorCode;
+        boolean IsValid;
+    };
+};
+
+module ims_msgs {
+    struct JointFeedback {
+        @key ims_msgs::JointName JointName;
+        float PositionActual;
+        ims_msgs::ForceSensorInputs ForceActual;
+        float AbsoluteEncoderPositionUnits;
+    };
+};
+
+module AsensusMessaging {
+    struct Wrench {
+        double Fx;
+        double Fy;
+        double Fz;
+        double Mx;
+        double My;
+        double Mz;
+    };
+};
+
+module AsensusMessaging {
+    struct Vector3D {
+        float X;
+        float Y;
+        float Z;
+    };
+};
+
+module ims_msgs {
+    struct SixDofForceSensorInputs {
+        AsensusMessaging::Wrench Forces;
+        AsensusMessaging::Vector3D LinearAcceleration;
+        AsensusMessaging::Vector3D AngularVelocity;
+        unsigned long StatusCode;
+        unsigned long SampleCounter;
+        ims_msgs::DeviceIOErrorCode ErrorCode;
+        boolean IsValid;
+    };
+};
+
+module ims_msgs {
+    struct RoboticsInputs {
+        @key AsensusMessaging::ArmIDType ArmID;
+        sequence<ims_msgs::MotorFeedback,100> MotorData;
+        sequence<ims_msgs::JointFeedback,100> JointData;
+        ims_msgs::SixDofForceSensorInputs SixDofData;
+    };
+};

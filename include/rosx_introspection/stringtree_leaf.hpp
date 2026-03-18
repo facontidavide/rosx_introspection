@@ -79,6 +79,8 @@ namespace RosMsgParser {
 struct FieldLeaf {
   const FieldTreeNode* node;
   SmallVector<uint16_t, 4> index_array;
+  /// Key suffix for @key fields, e.g., "[ArmID:3]" or "[Ready]"
+  std::string key_suffix;
 };
 
 struct FieldsVector {
@@ -87,6 +89,7 @@ struct FieldsVector {
   FieldsVector(const FieldLeaf& leaf);
 
   SmallVector<uint16_t, 4> index_array;
+  std::string key_suffix;
 
   /// Utility functions to print the entire branch
   void toStr(std::string& destination) const;

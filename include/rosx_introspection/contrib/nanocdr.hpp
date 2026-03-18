@@ -205,7 +205,29 @@ public:
   // specializations for std::string
   void decode(std::string& out);
 
-  // Move forwardthe pointer of the buffer
+  /// Check if an optional member is present in the CDR stream.
+  /// Consumes the presence indicator from the buffer.
+  bool hasMember()
+  {
+    if (header_.version == CdrVersion::XCDRv1 || header_.version == CdrVersion::DDS_CDR)
+    {
+      // XCDRv1/DDS_CDR: 2 bytes member ID + 2 bytes size
+      uint16_t member_id = 0;
+      uint16_t size = 0;
+      decode(member_id);
+      decode(size);
+      return size != 0;
+    }
+    else
+    {
+      // XCDR2 PLAIN_CDR2: 1 byte boolean is_present
+      bool is_present = false;
+      decode(is_present);
+      return is_present;
+    }
+  }
+
+  // Move forward the pointer of the buffer
   void jump(size_t offset)
   {
     buffer_.trim_front(offset);
