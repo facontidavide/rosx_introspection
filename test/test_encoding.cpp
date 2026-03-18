@@ -285,7 +285,7 @@ TEST(Msgpack, LargeInputShouldNotCrash) {
         FlatMessage flat;
         flat.value.reserve(200000);
         for (int i = 0; i < 200000; i++) {
-          flat.value.emplace_back(FieldsVector(), Variant(int64_t(i)));
+          flat.value.emplace_back(FieldLeaf(), Variant(int64_t(i)));
         }
 
         std::vector<uint8_t> msgpack;

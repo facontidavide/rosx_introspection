@@ -37,11 +37,11 @@ struct FlatMessage {
 
   /// List of all those parsed fields that can be represented by a
   /// builtin value different from "string".
-  std::vector<std::pair<FieldsVector, Variant>> value;
+  std::vector<std::pair<FieldLeaf, Variant>> value;
 
   /// Store "blobs", i.e all those fields which are vectors of BYTES (AKA uint8_t),
   /// where the vector size is greater than the argument [max_array_size].
-  std::vector<std::pair<FieldsVector, Span<const uint8_t>>> blob;
+  std::vector<std::pair<FieldLeaf, Span<const uint8_t>>> blob;
 
   std::vector<std::vector<uint8_t>> blob_storage;
 };
@@ -152,6 +152,16 @@ class Parser {
   /// This is the unified deserialization path used by deserialize() and deserializeIntoJson().
   bool walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, SchemaWriter* writer) const;
 
+ private:
+  struct WalkState {
+    Deserializer* deserializer;
+    SchemaWriter* writer;
+    bool entire_message_parsed = true;
+  };
+
+  void walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkState& state) const;
+
+ public:
   /// Change where the warning messages are displayed.
   void setWarningsStream(std::ostream* output) {
     _global_warnings = output;
@@ -181,6 +191,7 @@ class Parser {
   MaxArrayPolicy _discard_large_array;
   size_t _max_array_size;
   BlobPolicy _blob_policy;
+  mutable size_t _estimated_field_count = 0;
   std::shared_ptr<ROSField> _dummy_root_field;
 
   std::unique_ptr<Deserializer> _deserializer;

@@ -83,219 +83,235 @@ inline void ExpandVectorIfNecessary(Container& container, size_t new_size) {
 
 bool Parser::walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, SchemaWriter* writer) const {
   deserializer->init(buffer);
-  bool entire_message_parsed = true;
 
-  std::function<void(const ROSMessage*, FieldLeaf, bool)> walkImpl;
-
-  walkImpl = [&](const ROSMessage* msg, FieldLeaf tree_leaf, bool store) {
-    size_t index_s = 0;
-
-    // --- @key fields: process first, add path suffixes ---
-    // (ported from dds-parser: keys are deserialized before other fields
-    //  and their values become path suffixes like [ArmID:3])
-    for (size_t fi = 0; fi < msg->fields().size(); fi++) {
-      const ROSField& field = msg->field(fi);
-      if (field.isConstant()) {
-        continue;
-      }
-      if (!field.isKey()) {
-        continue;
-      }
-
-      if (field.type().typeID() == STRING) {
-        std::string str;
-        deserializer->deserializeString(str);
-        tree_leaf.key_suffix = "[" + str + "]";
-      } else if (field.getEnum() != nullptr) {
-        Variant var = deserializer->deserialize(INT32);
-        int32_t enum_int = var.convert<int32_t>();
-        std::string enum_name = std::to_string(enum_int);
-        for (const auto& ev : field.getEnum()->values) {
-          if (ev.value == enum_int) {
-            enum_name = ev.name;
-            break;
-          }
-        }
-        tree_leaf.key_suffix = "[" + enum_name + "]";
-      } else if (field.type().isBuiltin()) {
-        Variant var = deserializer->deserialize(field.type().typeID());
-        tree_leaf.key_suffix =
-            "[" + field.name() + ":" + std::to_string(var.convert<int64_t>()) + "]";
-      }
-    }
-
-    // --- Process non-key fields ---
-    for (const ROSField& field : msg->fields()) {
-      bool DO_STORE = store;
-      if (field.isConstant()) {
-        continue;
-      }
-      if (field.isKey()) {
-        index_s++;
-        continue;  // already processed above
-      }
-
-      const ROSType& field_type = field.type();
-
-      // Handle @optional fields
-      if (field.isOptional()) {
-        bool is_present = deserializer->hasOptionalMember();
-        if (!is_present) {
-          index_s++;
-          continue;
-        }
-      }
-
-      auto new_tree_leaf = tree_leaf;
-      new_tree_leaf.node = tree_leaf.node->child(index_s);
-
-      int32_t array_size = field.arraySize();
-      if (array_size == -1) {
-        array_size = deserializer->deserializeUInt32();
-      }
-      if (field.isArray()) {
-        new_tree_leaf.index_array.push_back(0);
-      }
-
-      bool IS_BLOB = false;
-
-      if (array_size > static_cast<int32_t>(_max_array_size)) {
-        if (builtinSize(field_type.typeID()) == 1) {
-          IS_BLOB = true;
-        } else {
-          if (_discard_large_array) {
-            DO_STORE = false;
-          }
-          entire_message_parsed = false;
-        }
-      }
-
-      if (IS_BLOB) {
-        if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
-          throw std::runtime_error("Buffer overrun in walkSchema (blob)");
-        }
-        if (DO_STORE) {
-          writer->writeBlob(new_tree_leaf, Span<const uint8_t>(deserializer->getCurrentPtr(), array_size));
-        }
-        deserializer->jump(array_size);
-      } else {
-        bool DO_STORE_ARRAY = DO_STORE;
-        for (int i = 0; i < array_size; i++) {
-          if (DO_STORE_ARRAY && i >= static_cast<int32_t>(_max_array_size)) {
-            DO_STORE_ARRAY = false;
-          }
-          if (field.isArray() && DO_STORE_ARRAY) {
-            new_tree_leaf.index_array.back() = i;
-          }
-
-          // --- Enum fields ---
-          if (field.getEnum() != nullptr) {
-            Variant var = deserializer->deserialize(INT32);
-            if (DO_STORE_ARRAY) {
-              int32_t enum_int = var.convert<int32_t>();
-              std::string enum_name;
-              for (const auto& ev : field.getEnum()->values) {
-                if (ev.value == enum_int) {
-                  enum_name = ev.name;
-                  break;
-                }
-              }
-              writer->writeEnum(new_tree_leaf, enum_int, enum_name);
-            }
-          }
-          // --- Union fields ---
-          else if (field.getUnion() != nullptr) {
-            const auto* union_def = field.getUnion();
-            auto disc_type = toBuiltinType(union_def->discriminant_type);
-            std::string disc_value_str;
-
-            if (disc_type == OTHER) {
-              Variant disc_var = deserializer->deserialize(INT32);
-              int32_t disc_int = disc_var.convert<int32_t>();
-              auto enum_it = _schema->enum_library.find(ROSType(union_def->discriminant_type));
-              if (enum_it != _schema->enum_library.end()) {
-                for (const auto& ev : enum_it->second.values) {
-                  if (ev.value == disc_int) {
-                    disc_value_str = ev.name;
-                    break;
-                  }
-                }
-              }
-              if (disc_value_str.empty()) {
-                disc_value_str = std::to_string(disc_int);
-              }
-            } else {
-              Variant disc_var = deserializer->deserialize(disc_type);
-              disc_value_str = std::to_string(disc_var.convert<int64_t>());
-            }
-
-            auto case_it = union_def->cases.find(disc_value_str);
-            const UnionCaseField* active_case = nullptr;
-            if (case_it != union_def->cases.end()) {
-              active_case = &case_it->second;
-            } else if (union_def->default_case) {
-              active_case = &union_def->default_case.value();
-            }
-
-            if (active_case) {
-              if (active_case->type.typeID() == STRING) {
-                std::string str;
-                deserializer->deserializeString(str);
-                if (DO_STORE_ARRAY) {
-                  writer->writeString(new_tree_leaf, str);
-                }
-              } else if (active_case->type.isBuiltin()) {
-                Variant var = deserializer->deserialize(active_case->type.typeID());
-                if (DO_STORE_ARRAY) {
-                  writer->writeValue(new_tree_leaf, var);
-                }
-              } else {
-                auto case_msg_it = _schema->msg_library.find(active_case->type);
-                if (case_msg_it != _schema->msg_library.end()) {
-                  writer->beginStruct(field);
-                  walkImpl(case_msg_it->second.get(), new_tree_leaf, DO_STORE_ARRAY);
-                  writer->endStruct();
-                }
-              }
-            }
-          }
-          // --- String fields ---
-          else if (field_type.typeID() == STRING) {
-            std::string str;
-            deserializer->deserializeString(str);
-            if (DO_STORE_ARRAY) {
-              writer->writeString(new_tree_leaf, str);
-            }
-          }
-          // --- Builtin scalar fields ---
-          else if (field_type.isBuiltin()) {
-            Variant var = deserializer->deserialize(field_type.typeID());
-            if (DO_STORE_ARRAY) {
-              writer->writeValue(new_tree_leaf, var);
-            }
-          }
-          // --- Nested struct fields ---
-          else {
-            auto msg_node = field.getMessagePtr(_schema->msg_library);
-            writer->beginStruct(field);
-            walkImpl(msg_node.get(), new_tree_leaf, DO_STORE_ARRAY);
-            writer->endStruct();
-          }
-        }  // end for array_size
-      }
-
-      index_s++;
-    }  // end for fields
-  };
+  WalkState state;
+  state.deserializer = deserializer;
+  state.writer = writer;
 
   FieldLeaf rootnode;
   rootnode.node = _schema->field_tree.croot();
   auto root_msg = _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 
-  walkImpl(root_msg.get(), rootnode, true);
+  walkImpl(root_msg.get(), rootnode, true, state);
   writer->finish();
 
-  return entire_message_parsed;
+  return state.entire_message_parsed;
+}
+
+// Opt A: Direct method instead of std::function (eliminates type erasure + indirect call)
+// Opt B: FieldLeaf by reference with save/restore (eliminates SmallVector + string copy per field)
+// Opt C: snprintf for key suffixes (eliminates std::to_string temporaries)
+void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkState& state) const {
+  auto* deserializer = state.deserializer;
+  auto* writer = state.writer;
+  size_t index_s = 0;
+
+  // --- @key fields: process first, add path suffixes ---
+  for (size_t fi = 0; fi < msg->fields().size(); fi++) {
+    const ROSField& field = msg->field(fi);
+    if (field.isConstant() || !field.isKey()) {
+      continue;
+    }
+
+    char buf[96];
+    if (field.type().typeID() == STRING) {
+      std::string str;
+      deserializer->deserializeString(str);
+      int len = snprintf(buf, sizeof(buf), "[%s]", str.c_str());
+      leaf.key_suffix.assign(buf, len);
+    } else if (field.getEnum() != nullptr) {
+      Variant var = deserializer->deserialize(INT32);
+      int32_t enum_int = var.convert<int32_t>();
+      const char* enum_name = nullptr;
+      for (const auto& ev : field.getEnum()->values) {
+        if (ev.value == enum_int) {
+          enum_name = ev.name.c_str();
+          break;
+        }
+      }
+      if (enum_name) {
+        int len = snprintf(buf, sizeof(buf), "[%s]", enum_name);
+        leaf.key_suffix.assign(buf, len);
+      } else {
+        int len = snprintf(buf, sizeof(buf), "[%d]", enum_int);
+        leaf.key_suffix.assign(buf, len);
+      }
+    } else if (field.type().isBuiltin()) {
+      Variant var = deserializer->deserialize(field.type().typeID());
+      int len = snprintf(buf, sizeof(buf), "[%s:%ld]", field.name().c_str(), (long)var.convert<int64_t>());
+      leaf.key_suffix.assign(buf, len);
+    }
+  }
+
+  // Save leaf state for restore after each field (Opt B)
+  const auto* saved_node = leaf.node;
+  const auto saved_idx_size = leaf.index_array.size();
+  const auto saved_key_suffix = leaf.key_suffix;
+
+  // --- Process non-key fields ---
+  for (const ROSField& field : msg->fields()) {
+    bool DO_STORE = store;
+    if (field.isConstant()) {
+      continue;
+    }
+    if (field.isKey()) {
+      index_s++;
+      continue;
+    }
+
+    const ROSType& field_type = field.type();
+
+    if (field.isOptional()) {
+      if (!deserializer->hasOptionalMember()) {
+        index_s++;
+        continue;
+      }
+    }
+
+    // Mutate leaf in-place instead of copying (Opt B)
+    leaf.node = saved_node->child(index_s);
+
+    int32_t array_size = field.arraySize();
+    if (array_size == -1) {
+      array_size = deserializer->deserializeUInt32();
+    }
+
+    const bool is_array = field.isArray();
+    if (is_array) {
+      leaf.index_array.push_back(0);
+    }
+
+    bool IS_BLOB = false;
+
+    if (array_size > static_cast<int32_t>(_max_array_size)) {
+      if (builtinSize(field_type.typeID()) == 1) {
+        IS_BLOB = true;
+      } else {
+        if (_discard_large_array) {
+          DO_STORE = false;
+        }
+        state.entire_message_parsed = false;
+      }
+    }
+
+    if (IS_BLOB) {
+      if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
+        throw std::runtime_error("Buffer overrun in walkSchema (blob)");
+      }
+      if (DO_STORE) {
+        writer->writeBlob(leaf, Span<const uint8_t>(deserializer->getCurrentPtr(), array_size));
+      }
+      deserializer->jump(array_size);
+    } else {
+      bool DO_STORE_ARRAY = DO_STORE;
+      for (int i = 0; i < array_size; i++) {
+        if (DO_STORE_ARRAY && i >= static_cast<int32_t>(_max_array_size)) {
+          DO_STORE_ARRAY = false;
+        }
+        if (is_array && DO_STORE_ARRAY) {
+          leaf.index_array.back() = i;
+        }
+
+        if (field.getEnum() != nullptr) {
+          Variant var = deserializer->deserialize(INT32);
+          if (DO_STORE_ARRAY) {
+            int32_t enum_int = var.convert<int32_t>();
+            const std::string* enum_name = nullptr;
+            for (const auto& ev : field.getEnum()->values) {
+              if (ev.value == enum_int) {
+                enum_name = &ev.name;
+                break;
+              }
+            }
+            static const std::string empty_str;
+            writer->writeEnum(leaf, enum_int, enum_name ? *enum_name : empty_str);
+          }
+        } else if (field.getUnion() != nullptr) {
+          const auto* union_def = field.getUnion();
+          auto disc_type = toBuiltinType(union_def->discriminant_type);
+          std::string disc_value_str;
+
+          if (disc_type == OTHER) {
+            Variant disc_var = deserializer->deserialize(INT32);
+            int32_t disc_int = disc_var.convert<int32_t>();
+            auto enum_it = _schema->enum_library.find(ROSType(union_def->discriminant_type));
+            if (enum_it != _schema->enum_library.end()) {
+              for (const auto& ev : enum_it->second.values) {
+                if (ev.value == disc_int) {
+                  disc_value_str = ev.name;
+                  break;
+                }
+              }
+            }
+            if (disc_value_str.empty()) {
+              char buf[32];
+              snprintf(buf, sizeof(buf), "%d", disc_int);
+              disc_value_str = buf;
+            }
+          } else {
+            Variant disc_var = deserializer->deserialize(disc_type);
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%ld", (long)disc_var.convert<int64_t>());
+            disc_value_str = buf;
+          }
+
+          auto case_it = union_def->cases.find(disc_value_str);
+          const UnionCaseField* active_case = nullptr;
+          if (case_it != union_def->cases.end()) {
+            active_case = &case_it->second;
+          } else if (union_def->default_case) {
+            active_case = &union_def->default_case.value();
+          }
+
+          if (active_case) {
+            if (active_case->type.typeID() == STRING) {
+              std::string str;
+              deserializer->deserializeString(str);
+              if (DO_STORE_ARRAY) {
+                writer->writeString(leaf, str);
+              }
+            } else if (active_case->type.isBuiltin()) {
+              Variant var = deserializer->deserialize(active_case->type.typeID());
+              if (DO_STORE_ARRAY) {
+                writer->writeValue(leaf, var);
+              }
+            } else {
+              auto case_msg_it = _schema->msg_library.find(active_case->type);
+              if (case_msg_it != _schema->msg_library.end()) {
+                writer->beginStruct(field);
+                walkImpl(case_msg_it->second.get(), leaf, DO_STORE_ARRAY, state);
+                writer->endStruct();
+              }
+            }
+          }
+        } else if (field_type.typeID() == STRING) {
+          std::string str;
+          deserializer->deserializeString(str);
+          if (DO_STORE_ARRAY) {
+            writer->writeString(leaf, str);
+          }
+        } else if (field_type.isBuiltin()) {
+          Variant var = deserializer->deserialize(field_type.typeID());
+          if (DO_STORE_ARRAY) {
+            writer->writeValue(leaf, var);
+          }
+        } else {
+          auto msg_node = field.getMessagePtr(_schema->msg_library);
+          writer->beginStruct(field);
+          walkImpl(msg_node.get(), leaf, DO_STORE_ARRAY, state);
+          writer->endStruct();
+        }
+      }
+    }
+
+    // Restore leaf state (Opt B)
+    leaf.index_array.resize(saved_idx_size);
+    leaf.key_suffix = saved_key_suffix;
+    index_s++;
+  }
+
+  // Restore node pointer
+  leaf.node = saved_node;
 }
 
 //=============================================================================
@@ -311,12 +327,14 @@ class FlatMessageWriter : public SchemaWriter {
 
   void writeValue(const FieldLeaf& leaf, const Variant& value) override {
     ExpandVectorIfNecessary(_flat->value, _value_index);
-    _flat->value[_value_index++] = {FieldsVector(leaf), value};
+    _flat->value[_value_index].first = leaf;
+    _flat->value[_value_index].second = value;
+    _value_index++;
   }
 
   void writeString(const FieldLeaf& leaf, const std::string& str) override {
     ExpandVectorIfNecessary(_flat->value, _value_index);
-    _flat->value[_value_index].first = FieldsVector(leaf);
+    _flat->value[_value_index].first = leaf;
     _flat->value[_value_index].second = str;
     _value_index++;
   }
@@ -327,7 +345,7 @@ class FlatMessageWriter : public SchemaWriter {
 
   void writeBlob(const FieldLeaf& leaf, Span<const uint8_t> data) override {
     ExpandVectorIfNecessary(_flat->blob, _blob_index);
-    _flat->blob[_blob_index].first = FieldsVector(leaf);
+    _flat->blob[_blob_index].first = leaf;
 
     if (_blob_policy == Parser::STORE_BLOB_AS_COPY) {
       ExpandVectorIfNecessary(_flat->blob_storage, _blob_storage_index);
@@ -357,8 +375,42 @@ class FlatMessageWriter : public SchemaWriter {
 
 }  // namespace
 
+// Opt D: Estimate field count for pre-reservation
+static size_t estimateFieldCount(const ROSMessage* msg, const RosMessageLibrary& lib, int depth = 0) {
+  if (depth > 10) {
+    return 0;  // prevent infinite recursion
+  }
+  size_t count = 0;
+  for (const auto& field : msg->fields()) {
+    if (field.isConstant()) {
+      continue;
+    }
+    if (field.type().isBuiltin() || field.getEnum() || field.getUnion()) {
+      count++;
+    } else {
+      auto it = lib.find(field.type());
+      if (it != lib.end()) {
+        count += estimateFieldCount(it->second.get(), lib, depth + 1);
+      }
+    }
+  }
+  return count;
+}
+
 bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container, Deserializer* deserializer) const {
   flat_container->schema = _schema;
+
+  // Opt D: pre-reserve based on schema field count (cached after first call)
+  if (_estimated_field_count == 0) {
+    auto root_msg = _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
+    if (root_msg) {
+      _estimated_field_count = estimateFieldCount(root_msg.get(), _schema->msg_library);
+    }
+  }
+  if (flat_container->value.capacity() < _estimated_field_count) {
+    flat_container->value.reserve(_estimated_field_count);
+  }
+
   FlatMessageWriter writer(flat_container, _blob_policy);
   return walkSchema(buffer, deserializer, &writer);
 }

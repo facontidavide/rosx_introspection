@@ -25,6 +25,64 @@
 
 namespace RosMsgParser {
 
+// Helper: fill bracket placeholders in a cached path template using segment memcpy.
+static size_t fillBrackets(char* buf, const char* tmpl, size_t tmpl_size,
+                           const uint16_t* offsets, uint8_t num_brackets,
+                           const SmallVector<uint16_t, 4>& index_array) {
+  size_t out_off = 0;
+  size_t src_off = 0;
+
+  for (uint8_t i = 0; i < num_brackets; i++) {
+    size_t seg_len = offsets[i] - src_off;
+    std::memcpy(buf + out_off, tmpl + src_off, seg_len);
+    out_off += seg_len;
+
+    buf[out_off++] = '[';
+    if (i < index_array.size()) {
+      out_off += print_number(buf + out_off, index_array[i]);
+    }
+    buf[out_off++] = ']';
+    src_off = offsets[i] + 2;
+  }
+
+  size_t tail_len = tmpl_size - src_off;
+  if (tail_len > 0) {
+    std::memcpy(buf + out_off, tmpl + src_off, tail_len);
+    out_off += tail_len;
+  }
+
+  return out_off;
+}
+
+// FieldLeaf::toStr — uses precomputed path template + bracket offset table.
+void FieldLeaf::toStr(std::string& out) const {
+  if (!node) {
+    out.clear();
+    return;
+  }
+  const auto& tmpl = node->cachedPath();
+  const uint8_t num_brackets = node->bracketCount();
+
+  if (num_brackets == 0 && key_suffix.empty()) {
+    out = tmpl;
+    return;
+  }
+
+  size_t extra = index_array.size() * 5 + key_suffix.len;
+  out.resize(tmpl.size() + extra);
+
+  size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
+                               node->bracketOffsets(), num_brackets, index_array);
+
+  if (!key_suffix.empty()) {
+    std::memcpy(out.data() + offset, key_suffix.data, key_suffix.len);
+    offset += key_suffix.len;
+  }
+
+  out.resize(offset);
+}
+
+// FieldsVector — kept for backward compatibility
 FieldsVector::FieldsVector(const FieldLeaf& leaf) : _node(leaf.node) {
   index_array = leaf.index_array;
   key_suffix = leaf.key_suffix;
@@ -44,40 +102,18 @@ void FieldsVector::toStr(std::string& out) const {
     return;
   }
 
-  size_t extra = num_brackets * 5 + key_suffix.size();
+  size_t extra = num_brackets * 5 + key_suffix.len;
   out.resize(tmpl.size() + extra);
-  char* buf = out.data();
-  const char* src = tmpl.data();
 
-  size_t out_off = 0;
-  size_t src_off = 0;
-  const uint16_t* offsets = _node->bracketOffsets();
-
-  for (uint8_t i = 0; i < num_brackets; i++) {
-    size_t seg_len = offsets[i] - src_off;
-    std::memcpy(buf + out_off, src + src_off, seg_len);
-    out_off += seg_len;
-
-    buf[out_off++] = '[';
-    if (i < index_array.size()) {
-      out_off += print_number(buf + out_off, index_array[i]);
-    }
-    buf[out_off++] = ']';
-    src_off = offsets[i] + 2;
-  }
-
-  size_t tail_len = tmpl.size() - src_off;
-  if (tail_len > 0) {
-    std::memcpy(buf + out_off, src + src_off, tail_len);
-    out_off += tail_len;
-  }
+  size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
+                               _node->bracketOffsets(), num_brackets, index_array);
 
   if (!key_suffix.empty()) {
-    std::memcpy(buf + out_off, key_suffix.data(), key_suffix.size());
-    out_off += key_suffix.size();
+    std::memcpy(out.data() + offset, key_suffix.data, key_suffix.len);
+    offset += key_suffix.len;
   }
 
-  out.resize(out_off);
+  out.resize(offset);
 }
 
 }  // namespace RosMsgParser
