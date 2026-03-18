@@ -89,6 +89,16 @@ class ROSField {
     _array_size = size;
   }
 
+  /// For multi-dimensional arrays: stores each dimension separately.
+  /// E.g., data[3][4] → {3, 4}. Empty for 1D arrays or non-arrays.
+  const SmallVector<int, 2>& arrayDimensions() const {
+    return _array_dims;
+  }
+
+  void setArrayDimensions(const SmallVector<int, 2>& dims) {
+    _array_dims = dims;
+  }
+
   bool isOptional() const {
     return _is_optional;
   }
@@ -132,6 +142,7 @@ class ROSField {
   bool _is_array;
   bool _is_constant = false;
   int _array_size;
+  SmallVector<int, 2> _array_dims;  // multi-dimensional: {3, 4} for [3][4]
   bool _is_optional = false;
   bool _is_key = false;
 

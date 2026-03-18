@@ -177,8 +177,18 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
     }
 
     const bool is_array = field.isArray();
+    const auto& dims = field.arrayDimensions();
+    const bool is_multidim = dims.size() > 1;
+
     if (is_array) {
-      leaf.index_array.push_back(0);
+      if (is_multidim) {
+        // Push one index entry per dimension
+        for (size_t d = 0; d < dims.size(); d++) {
+          leaf.index_array.push_back(0);
+        }
+      } else {
+        leaf.index_array.push_back(0);
+      }
     }
 
     bool IS_BLOB = false;
@@ -209,7 +219,16 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
           DO_STORE_ARRAY = false;
         }
         if (is_array && DO_STORE_ARRAY) {
-          leaf.index_array.back() = i;
+          if (is_multidim) {
+            // Compute multi-dimensional indices from flat index
+            int flat = i;
+            for (int d = static_cast<int>(dims.size()) - 1; d >= 0; d--) {
+              leaf.index_array[saved_idx_size + d] = flat % dims[d];
+              flat /= dims[d];
+            }
+          } else {
+            leaf.index_array.back() = i;
+          }
         }
 
         if (field.getEnum() != nullptr) {

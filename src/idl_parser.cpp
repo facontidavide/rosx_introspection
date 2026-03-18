@@ -315,10 +315,9 @@ class IDLAstWalker {
     result.messages.push_back(std::move(msg));
   }
 
-  // Parse a single DECLARATOR node and return field_name + array_size
   struct DeclaratorInfo {
     std::string field_name;
-    int array_size = 1;
+    SmallVector<int, 2> array_dims;  // each dimension separately: {3, 4} for [3][4]
   };
 
   DeclaratorInfo parseDeclarator(const std::shared_ptr<peg::Ast>& child) {
@@ -330,11 +329,13 @@ class IDLAstWalker {
         if (decl_child->name == "IDENTIFIER" || decl_child->original_name == "IDENTIFIER") {
           info.field_name = decl_child->token_to_string();
         } else if (decl_child->name == "FIXED_ARRAY_SIZE" || decl_child->original_name == "FIXED_ARRAY_SIZE") {
+          int dim;
           if (!decl_child->nodes.empty()) {
-            info.array_size *= static_cast<int>(evaluateConstExpr(decl_child->nodes[0], result.constants));
+            dim = static_cast<int>(evaluateConstExpr(decl_child->nodes[0], result.constants));
           } else {
-            info.array_size *= static_cast<int>(evaluateConstExpr(decl_child, result.constants));
+            dim = static_cast<int>(evaluateConstExpr(decl_child, result.constants));
           }
+          info.array_dims.push_back(dim);
         }
       }
     }
@@ -385,16 +386,25 @@ class IDLAstWalker {
 
     // If no declarators found, try treating the whole node's last child as a declarator
     if (declarators.empty()) {
-      declarators.push_back({"unknown", 1});
+      declarators.push_back({"unknown", {}});
     }
 
     auto resolved_type_name = resolveTypeName(type_name, module_path);
 
     std::vector<ROSField> fields;
     for (const auto& decl : declarators) {
-      int arr_size = is_sequence ? -1 : decl.array_size;
+      // Compute total array size from dimensions
+      int total_size = 1;
+      for (int d : decl.array_dims) {
+        total_size *= d;
+      }
+      int arr_size = is_sequence ? -1 : (decl.array_dims.empty() ? 1 : total_size);
+
       ROSField field(ROSType(normalizeTypeName(resolved_type_name)), decl.field_name);
       field.setArray(arr_size != 1, arr_size);
+      if (decl.array_dims.size() > 1) {
+        field.setArrayDimensions(decl.array_dims);
+      }
       field.setIsKey(flags.is_key);
       field.setOptional(flags.is_optional);
       fields.push_back(std::move(field));

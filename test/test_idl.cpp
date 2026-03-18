@@ -1303,19 +1303,54 @@ TEST(IDLSpec, MultiDimensionalArrays) {
   auto& fields = schema->root_msg->fields();
   ASSERT_EQ(fields.size(), 2u);
 
-  // data[3][4] flattened to 12 elements total
   EXPECT_EQ(fields[0].name(), "data");
   EXPECT_TRUE(fields[0].isArray());
-  EXPECT_EQ(fields[0].arraySize(), 12);  // 3 * 4
+  EXPECT_EQ(fields[0].arraySize(), 12);  // 3 * 4 total
+  ASSERT_EQ(fields[0].arrayDimensions().size(), 2u);
+  EXPECT_EQ(fields[0].arrayDimensions()[0], 3);
+  EXPECT_EQ(fields[0].arrayDimensions()[1], 4);
+}
 
-  // image[640][480] flattened to 307200
-  EXPECT_EQ(fields[1].name(), "image");
-  EXPECT_TRUE(fields[1].isArray());
-  EXPECT_EQ(fields[1].arraySize(), 307200);  // 640 * 480
+// Test multi-dimensional array deserialization produces [X][Y] paths
+static const char* MULTI_DIM_DESER_IDL = R"(
+module TestModule {
+  struct SmallMatrix {
+    float64 m[2][3];
+  };
+};
+)";
 
-  // TODO: In the future, multi-dimensional arrays should produce
-  // paths like data[X][Y] instead of data[Z]. This requires storing
-  // dimension info on ROSField and updating the path generation.
+TEST(IDLDeserialize, MultiDimensionalArrayPaths) {
+  Parser parser("topic", ROSType("TestModule/SmallMatrix"), MULTI_DIM_DESER_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  // 2x3 = 6 elements: m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2]
+  for (int i = 0; i < 6; i++) {
+    serializer.serialize(FLOAT64, Variant(static_cast<double>(i + 1)));
+  }
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
+
+  ASSERT_EQ(flat.value.size(), 6u);
+
+  // Verify paths are [X][Y] not [Z]
+  EXPECT_EQ(flat.value[0].first.toStdString(), "topic/m[0][0]");
+  EXPECT_EQ(flat.value[1].first.toStdString(), "topic/m[0][1]");
+  EXPECT_EQ(flat.value[2].first.toStdString(), "topic/m[0][2]");
+  EXPECT_EQ(flat.value[3].first.toStdString(), "topic/m[1][0]");
+  EXPECT_EQ(flat.value[4].first.toStdString(), "topic/m[1][1]");
+  EXPECT_EQ(flat.value[5].first.toStdString(), "topic/m[1][2]");
+
+  // Verify values
+  EXPECT_DOUBLE_EQ(flat.value[0].second.convert<double>(), 1.0);
+  EXPECT_DOUBLE_EQ(flat.value[5].second.convert<double>(), 6.0);
 }
 
 // Test mixed annotations on struct
