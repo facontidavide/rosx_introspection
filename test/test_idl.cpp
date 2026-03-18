@@ -119,6 +119,13 @@ TEST(IDLParser, NestedModules) {
   ASSERT_EQ(schema->root_msg->fields().size(), 2u);
   EXPECT_EQ(schema->root_msg->field(0).name(), "start");
   EXPECT_EQ(schema->root_msg->field(1).name(), "end");
+
+  // Verify inner type is properly resolved in the library
+  auto point_it = schema->msg_library.find(ROSType("Outer::Inner/Point"));
+  ASSERT_NE(point_it, schema->msg_library.end());
+  EXPECT_EQ(point_it->second->fields().size(), 2u);
+  EXPECT_EQ(point_it->second->field(0).name(), "x");
+  EXPECT_EQ(point_it->second->field(1).name(), "y");
 }
 
 static const char* SEQUENCE_AND_ARRAY_IDL = R"(
@@ -187,6 +194,10 @@ TEST(IDLParser, Typedefs) {
   // ArmIDType should resolve to uint64
   EXPECT_EQ(fields[0].name(), "arm_id");
   EXPECT_EQ(fields[0].type().typeID(), UINT64);
+
+  // UserID (typedef string<36>) should resolve to STRING
+  EXPECT_EQ(fields[1].name(), "user");
+  EXPECT_EQ(fields[1].type().typeID(), STRING);
 }
 
 static const char* CONST_EXPR_IDL = R"(
@@ -770,16 +781,17 @@ TEST(IDLDeserialize, WalkSchemaConsistency) {
   auto buffer_size = serializer.getBufferSize();
   std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
 
-  // Test via deserialize (uses FlatMessageWriter internally)
   FlatMessage flat;
   NanoCDR_Deserializer deserializer;
   parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
 
   ASSERT_EQ(flat.value.size(), 4u);
 
-  // Check field paths contain the topic name and field names
-  std::string path0 = flat.value[0].first.toStdString();
-  EXPECT_NE(path0.find("x"), std::string::npos);
+  // Verify full paths for all fields
+  EXPECT_EQ(flat.value[0].first.toStdString(), "topic/x");
+  EXPECT_EQ(flat.value[1].first.toStdString(), "topic/y");
+  EXPECT_EQ(flat.value[2].first.toStdString(), "topic/z");
+  EXPECT_EQ(flat.value[3].first.toStdString(), "topic/qw");
 }
 
 // Test struct inheritance deserialization
@@ -1189,4 +1201,373 @@ TEST(IDLParser, RealWorldDataTypes) {
   EXPECT_EQ(fields[0].type().typeID(), UINT64);  // typedef resolved
   EXPECT_EQ(fields[1].name(), "State");
   EXPECT_EQ(fields[2].name(), "Position");
+}
+
+// ============================================================
+// IDL Spec Extensions Tests
+// ============================================================
+
+// Test forward declarations (struct Foo; without body)
+static const char* FORWARD_DCL_IDL = R"(
+module TestModule {
+  struct Foo;
+  union Bar;
+
+  struct Actual {
+    uint32 value;
+  };
+};
+)";
+
+TEST(IDLSpec, ForwardDeclarations) {
+  auto schema = ParseIDL("topic", ROSType("TestModule/Actual"), FORWARD_DCL_IDL);
+  ASSERT_NE(schema, nullptr);
+  ASSERT_EQ(schema->root_msg->fields().size(), 1u);
+  EXPECT_EQ(schema->root_msg->field(0).name(), "value");
+}
+
+// Test multiple declarators: int32 a, b, c;
+static const char* MULTI_DECL_IDL = R"(
+module TestModule {
+  struct MultiDecl {
+    uint32 a, b, c;
+    float64 x;
+  };
+};
+)";
+
+TEST(IDLSpec, MultipleDeclarators) {
+  auto schema = ParseIDL("topic", ROSType("TestModule/MultiDecl"), MULTI_DECL_IDL);
+  ASSERT_NE(schema, nullptr);
+  auto& fields = schema->root_msg->fields();
+  ASSERT_EQ(fields.size(), 4u);
+  EXPECT_EQ(fields[0].name(), "a");
+  EXPECT_EQ(fields[0].type().typeID(), UINT32);
+  EXPECT_EQ(fields[1].name(), "b");
+  EXPECT_EQ(fields[1].type().typeID(), UINT32);
+  EXPECT_EQ(fields[2].name(), "c");
+  EXPECT_EQ(fields[2].type().typeID(), UINT32);
+  EXPECT_EQ(fields[3].name(), "x");
+  EXPECT_EQ(fields[3].type().typeID(), FLOAT64);
+}
+
+// Test float constants
+static const char* FLOAT_CONST_IDL = R"(
+module TestModule {
+  const double PI = 3.14159;
+  const float FACTOR = 0.5;
+
+  struct WithFloatConst {
+    float64 angle;
+  };
+};
+)";
+
+TEST(IDLSpec, FloatConstants) {
+  // Should parse without error (float constants don't affect struct layout)
+  auto schema = ParseIDL("topic", ROSType("TestModule/WithFloatConst"), FLOAT_CONST_IDL);
+  ASSERT_NE(schema, nullptr);
+  ASSERT_EQ(schema->root_msg->fields().size(), 1u);
+}
+
+// Test string constants
+static const char* STRING_CONST_IDL = R"(
+module TestModule {
+  const string DEFAULT_NAME = "hello_world";
+
+  struct WithStringConst {
+    uint32 id;
+  };
+};
+)";
+
+TEST(IDLSpec, StringConstants) {
+  auto schema = ParseIDL("topic", ROSType("TestModule/WithStringConst"), STRING_CONST_IDL);
+  ASSERT_NE(schema, nullptr);
+  ASSERT_EQ(schema->root_msg->fields().size(), 1u);
+}
+
+// Test multi-dimensional arrays
+static const char* MULTI_DIM_ARRAY_IDL = R"(
+module TestModule {
+  struct Matrix {
+    float64 data[3][4];
+    uint8 image[640][480];
+  };
+};
+)";
+
+TEST(IDLSpec, MultiDimensionalArrays) {
+  auto schema = ParseIDL("topic", ROSType("TestModule/Matrix"), MULTI_DIM_ARRAY_IDL);
+  ASSERT_NE(schema, nullptr);
+  auto& fields = schema->root_msg->fields();
+  ASSERT_EQ(fields.size(), 2u);
+
+  // data[3][4] flattened to 12 elements total
+  EXPECT_EQ(fields[0].name(), "data");
+  EXPECT_TRUE(fields[0].isArray());
+  EXPECT_EQ(fields[0].arraySize(), 12);  // 3 * 4
+
+  // image[640][480] flattened to 307200
+  EXPECT_EQ(fields[1].name(), "image");
+  EXPECT_TRUE(fields[1].isArray());
+  EXPECT_EQ(fields[1].arraySize(), 307200);  // 640 * 480
+
+  // TODO: In the future, multi-dimensional arrays should produce
+  // paths like data[X][Y] instead of data[Z]. This requires storing
+  // dimension info on ROSField and updating the path generation.
+}
+
+// Test mixed annotations on struct
+static const char* STRUCT_ANNOTATIONS_IDL = R"(
+module TestModule {
+  @final
+  struct FinalStruct {
+    uint32 id;
+  };
+
+  @appendable
+  struct AppendableStruct {
+    uint32 id;
+    @optional float64 extra;
+  };
+};
+)";
+
+TEST(IDLSpec, StructAnnotations) {
+  // @final and @appendable should parse without error
+  auto schema = ParseIDL("topic", ROSType("TestModule/AppendableStruct"), STRUCT_ANNOTATIONS_IDL);
+  ASSERT_NE(schema, nullptr);
+  auto& fields = schema->root_msg->fields();
+  ASSERT_EQ(fields.size(), 2u);
+  EXPECT_EQ(fields[0].name(), "id");
+  EXPECT_FALSE(fields[0].isOptional());
+  EXPECT_EQ(fields[1].name(), "extra");
+  EXPECT_TRUE(fields[1].isOptional());
+}
+
+// Test deserialization with multiple declarators
+TEST(IDLDeserialize, MultipleDeclarators) {
+  Parser parser("topic", ROSType("TestModule/MultiDecl"), MULTI_DECL_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(1)));
+  serializer.serialize(UINT32, Variant(uint32_t(2)));
+  serializer.serialize(UINT32, Variant(uint32_t(3)));
+  serializer.serialize(FLOAT64, Variant(4.0));
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
+
+  ASSERT_EQ(flat.value.size(), 4u);
+  EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 1u);
+  EXPECT_EQ(flat.value[1].second.convert<uint32_t>(), 2u);
+  EXPECT_EQ(flat.value[2].second.convert<uint32_t>(), 3u);
+  EXPECT_DOUBLE_EQ(flat.value[3].second.convert<double>(), 4.0);
+}
+
+// ============================================================
+// Review-Driven Test Additions
+// ============================================================
+
+// C2: Union with enum discriminator deserialization
+static const char* UNION_ENUM_DISC_IDL = R"(
+module TestModule {
+  enum ColorEnum { Red, Green, Blue };
+  union ColorUnion switch(ColorEnum) {
+    case Red: float64 red_val;
+    case Blue: uint32 blue_val;
+  };
+  struct ColorMsg {
+    uint32 id;
+    ColorUnion color;
+  };
+};
+)";
+
+TEST(IDLDeserialize, UnionWithEnumDiscriminator) {
+  Parser parser("topic", ROSType("TestModule/ColorMsg"), UNION_ENUM_DISC_IDL, DDS_IDL);
+
+  // Discriminator = 0 (Red) → expect float64 red_val
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(1)));  // id
+  serializer.serialize(INT32, Variant(int32_t(0)));     // discriminator = Red
+  serializer.serialize(FLOAT64, Variant(3.14));         // red_val
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
+
+  ASSERT_EQ(flat.value.size(), 2u);
+  EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 1u);
+  EXPECT_DOUBLE_EQ(flat.value[1].second.convert<double>(), 3.14);
+}
+
+// C3: Union with default case deserialization
+static const char* UNION_DEFAULT_IDL = R"(
+module TestModule {
+  union DefaultUnion switch(int32) {
+    case 0: float64 val_a;
+    default: uint32 val_default;
+  };
+  struct DefaultMsg {
+    DefaultUnion data;
+  };
+};
+)";
+
+TEST(IDLDeserialize, UnionWithDefaultCase) {
+  Parser parser("topic", ROSType("TestModule/DefaultMsg"), UNION_DEFAULT_IDL, DDS_IDL);
+
+  // Discriminator = 99 (no matching case) → should use default (uint32)
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(INT32, Variant(int32_t(99)));    // discriminator = 99 → default
+  serializer.serialize(UINT32, Variant(uint32_t(42)));  // val_default
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
+
+  ASSERT_EQ(flat.value.size(), 1u);
+  EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 42u);
+}
+
+// I1: @value() annotation on enum members (focused test)
+static const char* VALUE_ANNOTATION_ENUM_IDL = R"(
+module TestModule {
+  enum Sparse {
+    @value(10) A,
+    B,
+    @value(20) C,
+    D
+  };
+  struct SparseMsg {
+    Sparse val;
+  };
+};
+)";
+
+TEST(IDLSpec, ValueAnnotationEnum) {
+  auto schema = ParseIDL("topic", ROSType("TestModule/SparseMsg"), VALUE_ANNOTATION_ENUM_IDL);
+  ASSERT_NE(schema, nullptr);
+
+  auto enum_it = schema->enum_library.find(ROSType("TestModule/Sparse"));
+  ASSERT_NE(enum_it, schema->enum_library.end());
+  ASSERT_EQ(enum_it->second.values.size(), 4u);
+  EXPECT_EQ(enum_it->second.values[0].name, "A");
+  EXPECT_EQ(enum_it->second.values[0].value, 10);
+  EXPECT_EQ(enum_it->second.values[1].name, "B");
+  EXPECT_EQ(enum_it->second.values[1].value, 11);  // auto-increment after 10
+  EXPECT_EQ(enum_it->second.values[2].name, "C");
+  EXPECT_EQ(enum_it->second.values[2].value, 20);
+  EXPECT_EQ(enum_it->second.values[3].name, "D");
+  EXPECT_EQ(enum_it->second.values[3].value, 21);  // auto-increment after 20
+}
+
+// I2: Split/repeated module blocks
+static const char* SPLIT_MODULE_IDL = R"(
+module Shared {
+  struct Point {
+    float64 x;
+    float64 y;
+  };
+};
+
+module Shared {
+  struct Color {
+    uint8 r;
+    uint8 g;
+    uint8 b;
+  };
+};
+
+module Shared {
+  struct ColoredPoint {
+    Point pos;
+    Color col;
+  };
+};
+)";
+
+TEST(IDLSpec, SplitModuleBlocks) {
+  auto schema = ParseIDL("topic", ROSType("Shared/ColoredPoint"), SPLIT_MODULE_IDL);
+  ASSERT_NE(schema, nullptr);
+
+  // Both Point and Color from separate module blocks should be resolved
+  auto& fields = schema->root_msg->fields();
+  ASSERT_EQ(fields.size(), 2u);
+  EXPECT_EQ(fields[0].name(), "pos");
+  EXPECT_EQ(fields[1].name(), "col");
+
+  // Verify both types exist in the library
+  EXPECT_NE(schema->msg_library.find(ROSType("Shared/Point")), schema->msg_library.end());
+  EXPECT_NE(schema->msg_library.find(ROSType("Shared/Color")), schema->msg_library.end());
+}
+
+// I3: Error handling — invalid IDL syntax
+TEST(IDLSpec, InvalidIDLSyntaxThrows) {
+  EXPECT_THROW(
+      ParseIDL("topic", ROSType("X/Y"), "this is not valid IDL {{{"),
+      std::runtime_error);
+}
+
+// I4: Error handling — division by zero in constants
+TEST(IDLSpec, DivisionByZeroThrows) {
+  const char* idl = R"(
+    module T {
+      const int32 X = 10 / 0;
+      struct S { uint32 v; };
+    };
+  )";
+  EXPECT_THROW(ParseIDL("topic", ROSType("T/S"), idl), std::runtime_error);
+}
+
+// I5: Empty sequence through IDL pipeline
+static const char* EMPTY_SEQ_IDL = R"(
+module TestModule {
+  struct EmptySeqMsg {
+    uint32 before;
+    sequence<float64> values;
+    uint32 after;
+  };
+};
+)";
+
+TEST(IDLDeserialize, EmptySequence) {
+  Parser parser("topic", ROSType("TestModule/EmptySeqMsg"), EMPTY_SEQ_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(11)));  // before
+  serializer.serializeUInt32(0);                         // sequence length = 0
+  serializer.serialize(UINT32, Variant(uint32_t(22)));  // after
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
+
+  // Empty sequence → only before and after fields
+  ASSERT_EQ(flat.value.size(), 2u);
+  EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 11u);
+  EXPECT_EQ(flat.value[1].second.convert<uint32_t>(), 22u);
 }

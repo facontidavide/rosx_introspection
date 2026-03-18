@@ -55,6 +55,12 @@ int64_t evaluateConstExpr(const std::shared_ptr<peg::Ast>& ast,
   if (ast->name == "HEX_LITERAL") {
     return std::stoll(ast->token_to_string(), nullptr, 16);
   }
+  if (ast->name == "FLOAT_LITERAL") {
+    return static_cast<int64_t>(std::stod(ast->token_to_string()));
+  }
+  if (ast->name == "STRING_LITERAL") {
+    return 0;  // strings can't be used as integer constants
+  }
   if (ast->name == "SCOPED_NAME" || ast->name == "IDENTIFIER") {
     auto name = ast->token_to_string();
     auto it = constants.find(name);
@@ -290,8 +296,10 @@ class IDLAstWalker {
           base_type = child->nodes[0]->token_to_string();
         }
       } else if (role == "MEMBER") {
-        auto field = parseMember(child, module_path);
-        msg->fields().push_back(std::move(field));
+        auto fields = parseMember(child, module_path);
+        for (auto& f : fields) {
+          msg->fields().push_back(std::move(f));
+        }
       }
     }
 
@@ -307,16 +315,41 @@ class IDLAstWalker {
     result.messages.push_back(std::move(msg));
   }
 
-  ROSField parseMember(const std::shared_ptr<peg::Ast>& ast, const std::string& module_path) {
-    // MEMBER children: [ANNOTATION*] TYPE_SPEC DECLARATOR
+  // Parse a single DECLARATOR node and return field_name + array_size
+  struct DeclaratorInfo {
+    std::string field_name;
+    int array_size = 1;
+  };
+
+  DeclaratorInfo parseDeclarator(const std::shared_ptr<peg::Ast>& child) {
+    DeclaratorInfo info;
+    if (child->is_token) {
+      info.field_name = child->token_to_string();
+    } else {
+      for (const auto& decl_child : child->nodes) {
+        if (decl_child->name == "IDENTIFIER" || decl_child->original_name == "IDENTIFIER") {
+          info.field_name = decl_child->token_to_string();
+        } else if (decl_child->name == "FIXED_ARRAY_SIZE" || decl_child->original_name == "FIXED_ARRAY_SIZE") {
+          if (!decl_child->nodes.empty()) {
+            info.array_size *= static_cast<int>(evaluateConstExpr(decl_child->nodes[0], result.constants));
+          } else {
+            info.array_size *= static_cast<int>(evaluateConstExpr(decl_child, result.constants));
+          }
+        }
+      }
+    }
+    return info;
+  }
+
+  std::vector<ROSField> parseMember(const std::shared_ptr<peg::Ast>& ast, const std::string& module_path) {
+    // MEMBER children: [ANNOTATION*] TYPE_SPEC DECLARATORS
+    // DECLARATORS: DECLARATOR (COMMA DECLARATOR)*
     AnnotationFlags flags;
     std::string type_name;
-    std::string field_name;
-    int array_size = 1;  // 1=scalar, -1=sequence, >1=fixed array
+    bool is_sequence = false;
+    std::vector<DeclaratorInfo> declarators;
 
     for (const auto& child : ast->nodes) {
-      // After optimization: name=inner_rule, original_name=outer_rule
-      // Use original_name to determine the semantic role in MEMBER
       auto role = child->original_name.empty() ? child->name : child->original_name;
 
       if (role == "ANNOTATION" || child->name == "ANNOTATION") {
@@ -328,41 +361,45 @@ class IDLAstWalker {
         }
       } else if (role == "TYPE_SPEC") {
         if (isSequenceType(child)) {
+          is_sequence = true;
           type_name = getSequenceInnerType(child);
-          array_size = -1;
         } else if (isStringType(child)) {
           type_name = "string";
         } else {
           type_name = extractTypeName(child);
         }
-      } else if (role == "DECLARATOR") {
-        // After optimization, DECLARATOR may be a leaf (name=IDENTIFIER, original_name=DECLARATOR)
-        if (child->is_token) {
-          field_name = child->token_to_string();
-        } else {
-          for (const auto& decl_child : child->nodes) {
-            if (decl_child->name == "IDENTIFIER" || decl_child->original_name == "IDENTIFIER") {
-              field_name = decl_child->token_to_string();
-            } else if (decl_child->name == "FIXED_ARRAY_SIZE" || decl_child->original_name == "FIXED_ARRAY_SIZE") {
-              if (!decl_child->nodes.empty()) {
-                array_size = static_cast<int>(evaluateConstExpr(decl_child->nodes[0], result.constants));
-              } else {
-                array_size = static_cast<int>(evaluateConstExpr(decl_child, result.constants));
-              }
+      } else if (role == "DECLARATORS" || role == "DECLARATOR") {
+        // DECLARATORS contains one or more DECLARATOR children
+        if (child->name == "DECLARATORS") {
+          for (const auto& decl : child->nodes) {
+            if (decl->name == "DECLARATOR" || decl->original_name == "DECLARATOR") {
+              declarators.push_back(parseDeclarator(decl));
             }
           }
+        } else {
+          // Single DECLARATOR (may happen after optimization)
+          declarators.push_back(parseDeclarator(child));
         }
       }
     }
 
-    // Resolve scoped type names
+    // If no declarators found, try treating the whole node's last child as a declarator
+    if (declarators.empty()) {
+      declarators.push_back({"unknown", 1});
+    }
+
     auto resolved_type_name = resolveTypeName(type_name, module_path);
 
-    ROSField field(ROSType(normalizeTypeName(resolved_type_name)), field_name);
-    field.setArray(array_size != 1, array_size);
-    field.setIsKey(flags.is_key);
-    field.setOptional(flags.is_optional);
-    return field;
+    std::vector<ROSField> fields;
+    for (const auto& decl : declarators) {
+      int arr_size = is_sequence ? -1 : decl.array_size;
+      ROSField field(ROSType(normalizeTypeName(resolved_type_name)), decl.field_name);
+      field.setArray(arr_size != 1, arr_size);
+      field.setIsKey(flags.is_key);
+      field.setOptional(flags.is_optional);
+      fields.push_back(std::move(field));
+    }
+    return fields;
   }
 
   void handleEnum(const std::shared_ptr<peg::Ast>& ast, const std::string& module_path) {
@@ -463,8 +500,12 @@ class IDLAstWalker {
       auto role = roleName(child);
 
       if (role == "CASE_LABEL") {
-        if (child->is_token) {
-          // Optimized: CASE_LABEL[IDENTIFIER] or CASE_LABEL[DEC_LITERAL] etc.
+        // CASE_LABEL/0 = 'case' CONST_EXPR ':' (has children for the expression)
+        // CASE_LABEL/1 = 'default' ':'       (no children, KW_DEFAULT is suppressed)
+        if (child->nodes.empty() && !child->is_token) {
+          // No children = default label (KW_DEFAULT was suppressed by grammar)
+          is_default = true;
+        } else if (child->is_token) {
           auto tok = child->token_to_string();
           if (tok == "default") {
             is_default = true;
@@ -478,16 +519,11 @@ class IDLAstWalker {
           }
         } else {
           for (const auto& lc : child->nodes) {
-            auto lcrole = roleName(lc);
-            if (lc->is_token && lc->token_to_string() == "default") {
-              is_default = true;
-            } else {
-              try {
-                auto val = evaluateConstExpr(lc, result.constants);
-                labels.push_back(std::to_string(val));
-              } catch (...) {
-                labels.push_back(lc->token_to_string());
-              }
+            try {
+              auto val = evaluateConstExpr(lc, result.constants);
+              labels.push_back(std::to_string(val));
+            } catch (...) {
+              labels.push_back(lc->token_to_string());
             }
           }
         }
@@ -545,15 +581,21 @@ class IDLAstWalker {
         } else {
           base_type = extractTypeName(child);
         }
-      } else if (role == "DECLARATOR") {
-        if (child->is_token) {
-          alias_name = child->token_to_string();
-        } else {
-          for (const auto& dc : child->nodes) {
-            if (roleName(dc) == "IDENTIFIER") {
-              alias_name = dc->token_to_string();
+      } else if (role == "DECLARATORS" || role == "DECLARATOR") {
+        // For typedefs, extract the alias name from the first declarator
+        if (child->name == "DECLARATORS") {
+          for (const auto& decl : child->nodes) {
+            if (decl->name == "DECLARATOR" || decl->original_name == "DECLARATOR") {
+              auto info = parseDeclarator(decl);
+              alias_name = info.field_name;
+              break;  // only use first declarator for typedef
             }
           }
+        } else if (child->is_token) {
+          alias_name = child->token_to_string();
+        } else {
+          auto info = parseDeclarator(child);
+          alias_name = info.field_name;
         }
       }
     }
