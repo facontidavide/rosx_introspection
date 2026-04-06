@@ -2,8 +2,8 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+2.3.0 (2026-04-06)
+------------------
 * Add Ubuntu CI workflow for non-ROS builds
 * Use ament_cmake_gtest for tests in ROS2 builds
 * Fix review issues: throw on bracket overflow, fix reserve, use num_brackets for estimate
