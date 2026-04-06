@@ -9,9 +9,10 @@ jobs:
         env:
           - {ROS_DISTRO: humble, ROS_REPO: main}
           - {ROS_DISTRO: jazzy, ROS_REPO: main}
+          - {ROS_DISTRO: kilted, ROS_REPO: main}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: 'ros-industrial/industrial_ci@master'
         env: ${{matrix.env}}
         with:
