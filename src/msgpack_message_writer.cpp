@@ -5,22 +5,28 @@
 namespace RosMsgParser {
 
 MsgpackMessageWriter::MsgpackMessageWriter(std::vector<uint8_t>* output) : _output(output) {
-  _output->resize(64 * 1024);
-  // Reserve 5 bytes for the map header (MAP32 worst case), written in finish()
+  _output->clear();
+  _output->reserve(64 * 1024);
+  _output->resize(5);  // only zero the 5-byte map header placeholder
   _offset = 5;
   _count = 0;
 }
 
 void MsgpackMessageWriter::ensureCapacity(size_t additional) {
   size_t required = _offset + additional;
-  if (_output->size() >= required) {
+  if (_output->capacity() >= required) {
+    // Extend size without zeroing — we will overwrite these bytes
+    if (_output->size() < required) {
+      _output->resize(required);
+    }
     return;
   }
-  size_t new_size = _output->size();
-  while (new_size < required) {
-    new_size *= 2;
+  size_t new_cap = _output->capacity();
+  while (new_cap < required) {
+    new_cap *= 2;
   }
-  _output->resize(new_size);
+  _output->reserve(new_cap);
+  _output->resize(required);
 }
 
 void MsgpackMessageWriter::writeKey(const FieldLeaf& leaf) {
@@ -68,12 +74,10 @@ void MsgpackMessageWriter::writeEnum(const FieldLeaf& leaf, int32_t int_value,
 }
 
 void MsgpackMessageWriter::finish() {
-  // Write map header at the start, then shift data if header is smaller than 5 bytes
   uint8_t header[5];
   uint32_t header_size = msgpack::pack_map(header, _count);
 
   if (header_size < 5) {
-    // Shift data left to close the gap
     size_t gap = 5 - header_size;
     std::memmove(_output->data() + header_size, _output->data() + 5, _offset - 5);
     _offset -= gap;
