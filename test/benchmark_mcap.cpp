@@ -29,37 +29,55 @@
 #define MCAP_IMPLEMENTATION
 #include <mcap/reader.hpp>
 
+#include "rosx_introspection/msgpack_utils.hpp"
 #include "rosx_introspection/ros_parser.hpp"
+
+enum class WriterMode { FLAT, JSON, MSGPACK };
 
 struct TopicStats {
   size_t message_count = 0;
   size_t total_bytes = 0;
-  double total_deserialize_ms = 0;
-  double total_json_ms = 0;
+  double total_ms = 0;
 };
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <mcap_file> [--iterations N] [--json]" << std::endl;
+    std::cerr << "Usage: " << argv[0]
+              << " <mcap_file> [--iterations N] [--writer flat|json|msgpack]" << std::endl;
     return 1;
   }
 
   std::string mcap_file = argv[1];
   int iterations = 1;
-  bool bench_json = false;
+  WriterMode mode = WriterMode::FLAT;
 
   for (int i = 2; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--iterations" && i + 1 < argc) {
       iterations = std::stoi(argv[++i]);
-    } else if (arg == "--json") {
-      bench_json = true;
+    } else if (arg == "--writer" && i + 1 < argc) {
+      std::string val = argv[++i];
+      if (val == "flat") {
+        mode = WriterMode::FLAT;
+      } else if (val == "json") {
+        mode = WriterMode::JSON;
+      } else if (val == "msgpack") {
+        mode = WriterMode::MSGPACK;
+      } else {
+        std::cerr << "Unknown writer: " << val << " (use flat, json, or msgpack)" << std::endl;
+        return 1;
+      }
     }
   }
 
+  const char* mode_str = (mode == WriterMode::FLAT)    ? "flat"
+                         : (mode == WriterMode::JSON)   ? "json"
+                         : (mode == WriterMode::MSGPACK) ? "msgpack"
+                                                         : "unknown";
+
   std::cout << "Benchmark: " << mcap_file << std::endl;
   std::cout << "Iterations: " << iterations << std::endl;
-  std::cout << "JSON benchmark: " << (bench_json ? "yes" : "no") << std::endl;
+  std::cout << "Writer: " << mode_str << std::endl;
   std::cout << "---" << std::endl;
 
   for (int iter = 0; iter < iterations; iter++) {
@@ -77,6 +95,7 @@ int main(int argc, char** argv) {
     RosMsgParser::FlatMessage flat_msg;
     RosMsgParser::NanoCDR_Deserializer deserializer;
     std::string json_output;
+    std::vector<uint8_t> msgpack_output;
 
     auto onProblem = [](const mcap::Status& problem) {
       std::cerr << "Warning: " << problem.message << std::endl;
@@ -122,40 +141,36 @@ int main(int argc, char** argv) {
       topic_stats.total_bytes += buffer.size();
       topic_stats.message_count++;
 
-      // Benchmark deserialize
       auto t0 = std::chrono::high_resolution_clock::now();
       try {
-        parser.deserialize(buffer, &flat_msg, &deserializer);
-
-        std::string field_name;
-        for (const auto& pair : flat_msg.value) {
-          pair.first.toStr(field_name);
+        switch (mode) {
+          case WriterMode::FLAT: {
+            parser.deserialize(buffer, &flat_msg, &deserializer);
+            std::string field_name;
+            for (const auto& pair : flat_msg.value) {
+              pair.first.toStr(field_name);
+            }
+            break;
+          }
+          case WriterMode::JSON:
+            parser.deserializeIntoJson(buffer, &json_output, &deserializer);
+            break;
+          case WriterMode::MSGPACK:
+            RosMsgParser::deserializeToMsgpack(parser, buffer, &deserializer, msgpack_output);
+            break;
         }
       } catch (const std::exception& e) {
         continue;
       }
       auto t1 = std::chrono::high_resolution_clock::now();
-      topic_stats.total_deserialize_ms +=
+      topic_stats.total_ms +=
           std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.0;
-
-      // Optionally benchmark JSON
-      if (bench_json) {
-        auto t2 = std::chrono::high_resolution_clock::now();
-        try {
-          parser.deserializeIntoJson(buffer, &json_output, &deserializer);
-        } catch (const std::exception& e) {
-        }
-        auto t3 = std::chrono::high_resolution_clock::now();
-        topic_stats.total_json_ms +=
-            std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() / 1000.0;
-      }
     }
 
     auto total_end = std::chrono::high_resolution_clock::now();
-    double total_ms =
+    double wall_ms =
         std::chrono::duration_cast<std::chrono::microseconds>(total_end - total_start).count() / 1000.0;
 
-    // Print results
     if (iterations > 1) {
       std::cout << "\n=== Iteration " << (iter + 1) << " ===" << std::endl;
     }
@@ -167,27 +182,21 @@ int main(int argc, char** argv) {
     for (const auto& [topic, s] : stats) {
       total_messages += s.message_count;
       total_bytes += s.total_bytes;
-      total_deser_ms += s.total_deserialize_ms;
+      total_deser_ms += s.total_ms;
 
-      double msgs_per_sec = s.message_count / (s.total_deserialize_ms / 1000.0);
-      double mb_per_sec = (s.total_bytes / (1024.0 * 1024.0)) / (s.total_deserialize_ms / 1000.0);
+      double msgs_per_sec = s.message_count / (s.total_ms / 1000.0);
+      double mb_per_sec = (s.total_bytes / (1024.0 * 1024.0)) / (s.total_ms / 1000.0);
 
       std::cout << topic << ":" << std::endl;
       std::cout << "  messages: " << s.message_count << std::endl;
       std::cout << "  bytes: " << s.total_bytes << std::endl;
-      std::cout << "  deserialize: " << s.total_deserialize_ms << " ms"
+      std::cout << "  " << mode_str << ": " << s.total_ms << " ms"
                 << " (" << msgs_per_sec << " msg/s, " << mb_per_sec << " MB/s)" << std::endl;
-
-      if (bench_json && s.total_json_ms > 0) {
-        double json_msgs_per_sec = s.message_count / (s.total_json_ms / 1000.0);
-        std::cout << "  json: " << s.total_json_ms << " ms"
-                  << " (" << json_msgs_per_sec << " msg/s)" << std::endl;
-      }
     }
 
     std::cout << "\nTotal: " << total_messages << " messages, " << total_bytes << " bytes" << std::endl;
-    std::cout << "  deserialize only: " << total_deser_ms << " ms" << std::endl;
-    std::cout << "  wall clock (incl. MCAP I/O): " << total_ms << " ms" << std::endl;
+    std::cout << "  " << mode_str << " only: " << total_deser_ms << " ms" << std::endl;
+    std::cout << "  wall clock (incl. MCAP I/O): " << wall_ms << " ms" << std::endl;
 
     reader.close();
   }
