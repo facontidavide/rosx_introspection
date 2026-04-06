@@ -68,7 +68,7 @@ void FieldLeaf::toStr(std::string& out) const {
     return;
   }
 
-  size_t extra = index_array.size() * 5 + key_suffix.len;
+  size_t extra = num_brackets * 5 + key_suffix.len;
   out.resize(tmpl.size() + extra);
 
   size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
