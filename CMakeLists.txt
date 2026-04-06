@@ -88,36 +88,42 @@ if(BUILD_TESTING)
     enable_testing()
 
     if(USING_ROS2)
-        find_package(ament_cmake_gtest QUIET)
-        if(ament_cmake_gtest_FOUND)
-            find_package(sensor_msgs REQUIRED)
-            find_package(geometry_msgs REQUIRED)
+        find_package(ament_cmake_gtest REQUIRED)
+        find_package(sensor_msgs REQUIRED)
+        find_package(geometry_msgs REQUIRED)
 
-            ament_add_gtest(rosx_introspection_test
-                test/test_parser.cpp
-                test/test_ros2.cpp )
+        ament_add_gtest(rosx_introspection_test
+            test/test_parser.cpp
+            test/test_ros2.cpp )
 
-            target_link_libraries(rosx_introspection_test
-                rosx_introspection
-                ${sensor_msgs_TARGETS}
-                ${geometry_msgs_TARGETS}
-                )
+        target_link_libraries(rosx_introspection_test
+            rosx_introspection
+            ${sensor_msgs_TARGETS}
+            ${geometry_msgs_TARGETS}
+            )
 
-            target_include_directories(rosx_introspection_test PUBLIC
-                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-        endif()
-    endif(USING_ROS2)
+        target_include_directories(rosx_introspection_test PUBLIC
+                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 
-    find_package(GTest REQUIRED)
-
-    add_executable(parser_test
+        ament_add_gtest(parser_test
             test/test_parser.cpp
             test/test_encoding.cpp)
 
-    target_link_libraries(parser_test rosx_introspection GTest::GTest GTest::Main)
-    target_include_directories(parser_test PUBLIC
+        target_link_libraries(parser_test rosx_introspection)
+        target_include_directories(parser_test PUBLIC
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-    add_test(NAME parser_test COMMAND parser_test)
+    else()
+        find_package(GTest REQUIRED)
+
+        add_executable(parser_test
+                test/test_parser.cpp
+                test/test_encoding.cpp)
+
+        target_link_libraries(parser_test rosx_introspection GTest::GTest GTest::Main)
+        target_include_directories(parser_test PUBLIC
+                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+        add_test(NAME parser_test COMMAND parser_test)
+    endif()
 
 endif(BUILD_TESTING)
 
