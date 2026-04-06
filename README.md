@@ -1,5 +1,10 @@
 # ROS X Introspection
 
+[![Humble](https://github.com/facontidavide/rosx_introspection/actions/workflows/humble.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/humble.yaml)
+[![Jazzy](https://github.com/facontidavide/rosx_introspection/actions/workflows/jazzy.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/jazzy.yaml)
+[![Kilted](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml)
+[![Rolling](https://github.com/facontidavide/rosx_introspection/actions/workflows/rolling.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/rolling.yaml)
+
 Unified successor of the following libraries:
 
 - [ros_type_introspection](https://github.com/facontidavide/ros_type_introspection)
