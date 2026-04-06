@@ -112,6 +112,13 @@ if(BUILD_TESTING)
         target_link_libraries(parser_test rosx_introspection)
         target_include_directories(parser_test PUBLIC
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
+        ament_add_gtest(idl_parser_test
+            test/test_idl.cpp)
+
+        target_link_libraries(idl_parser_test rosx_introspection)
+        target_include_directories(idl_parser_test PUBLIC
+                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     else()
         find_package(GTest REQUIRED)
 
@@ -123,15 +130,15 @@ if(BUILD_TESTING)
         target_include_directories(parser_test PUBLIC
                     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
         add_test(NAME parser_test COMMAND parser_test)
+
+        add_executable(idl_parser_test
+                test/test_idl.cpp)
+
+        target_link_libraries(idl_parser_test rosx_introspection GTest::GTest GTest::Main)
+        target_include_directories(idl_parser_test PUBLIC
+                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+        add_test(NAME idl_parser_test COMMAND idl_parser_test)
     endif()
-
-    add_executable(idl_parser_test
-            test/test_idl.cpp)
-
-    target_link_libraries(idl_parser_test rosx_introspection GTest::GTest GTest::Main)
-    target_include_directories(idl_parser_test PUBLIC
-                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-    add_test(NAME idl_parser_test COMMAND idl_parser_test)
 
     add_executable(idl_benchmark test/benchmark_idl.cpp)
     target_link_libraries(idl_benchmark rosx_introspection)
