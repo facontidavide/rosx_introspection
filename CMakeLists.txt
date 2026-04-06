@@ -85,6 +85,8 @@ endif(ROSX_HAS_JSON)
 ## Install and Tests
 ###############################################
 if(BUILD_TESTING)
+    enable_testing()
+
     if(USING_ROS2)
         find_package(sensor_msgs REQUIRED)
         find_package(geometry_msgs REQUIRED)
@@ -121,9 +123,21 @@ endif(BUILD_TESTING)
 ## Benchmarks
 ###############################################
 option(BUILD_BENCHMARKS "Build benchmark executables" OFF)
-if(BUILD_BENCHMARKS AND USING_ROS2)
+if(BUILD_BENCHMARKS)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET liblz4)
+    pkg_check_modules(ZSTD REQUIRED IMPORTED_TARGET libzstd)
+
+    CPMAddPackage(
+        NAME mcap
+        GIT_TAG releases/cpp/v2.1.3
+        GITHUB_REPOSITORY "foxglove/mcap"
+        DOWNLOAD_ONLY YES
+    )
+
     add_executable(mcap_benchmark test/benchmark_mcap.cpp)
-    target_link_libraries(mcap_benchmark rosx_introspection)
+    target_link_libraries(mcap_benchmark rosx_introspection PkgConfig::LZ4 PkgConfig::ZSTD)
+    target_include_directories(mcap_benchmark PRIVATE ${mcap_SOURCE_DIR}/cpp/mcap/include)
 endif()
 
 if(USING_ROS2)
