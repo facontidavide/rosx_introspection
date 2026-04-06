@@ -1,0 +1,21 @@
+name: Ubuntu
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libgtest-dev rapidjson-dev
+
+      - name: Build and test
+        run: |
+          mkdir build && cd build
+          cmake .. -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          ctest --output-on-failure
