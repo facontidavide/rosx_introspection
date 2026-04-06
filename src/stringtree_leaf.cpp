@@ -43,7 +43,7 @@ void FieldsVector::toStr(std::string& out) const {
     return;
   }
 
-  size_t extra = index_array.size() * 5;
+  size_t extra = num_brackets * 5;
   out.resize(tmpl.size() + extra);
   char* buf = out.data();
   const char* src = tmpl.data();

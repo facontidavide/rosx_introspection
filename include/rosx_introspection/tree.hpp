@@ -108,8 +108,11 @@ class TreeNode {
   void setCachedPath(std::string path) {
     _cached_path = std::move(path);
     _bracket_count = 0;
-    for (size_t i = 0; i + 1 < _cached_path.size() && _bracket_count < max_brackets; i++) {
+    for (size_t i = 0; i + 1 < _cached_path.size(); i++) {
       if (_cached_path[i] == '[' && _cached_path[i + 1] == ']') {
+        if (_bracket_count >= max_brackets) {
+          throw std::runtime_error("Cached path exceeds maximum bracket count");
+        }
         _bracket_offsets[_bracket_count++] = static_cast<uint16_t>(i);
       }
     }
