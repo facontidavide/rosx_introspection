@@ -152,6 +152,17 @@ class Parser {
   }
 
  private:
+  struct DeserializeState {
+    FlatMessage* flat;
+    Deserializer* deserializer;
+    bool entire_message_parsed = true;
+    size_t value_index = 0;
+    size_t blob_index = 0;
+    size_t blob_storage_index = 0;
+  };
+
+  void deserializeImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, DeserializeState& state) const;
+
   std::shared_ptr<MessageSchema> _schema;
 
   std::ostream* _global_warnings;

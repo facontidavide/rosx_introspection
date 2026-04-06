@@ -25,108 +25,53 @@
 
 namespace RosMsgParser {
 
-FieldsVector::FieldsVector(const FieldLeaf& leaf) {
-  auto node = leaf.node;
-  while (node && node->value()) {
-    fields.push_back(node->value());
-    node = node->parent();
-  }
-  std::reverse(fields.begin(), fields.end());
+FieldsVector::FieldsVector(const FieldLeaf& leaf) : _node(leaf.node) {
   index_array = leaf.index_array;
 }
 
 void FieldsVector::toStr(std::string& out) const {
-  size_t total_size = 0;
-  for (const ROSField* field : fields) {
-    total_size += field->name().size() + 1;
-    if (field->isArray()) {
-      total_size += (2 + 4);  // super conservative (9999)
-    }
+  if (!_node) {
+    out.clear();
+    return;
   }
 
-  out.resize(total_size);
-  char* buffer = static_cast<char*>(&out[0]);
+  const auto& tmpl = _node->cachedPath();
+  const uint8_t num_brackets = _node->bracketCount();
 
-  size_t array_count = 0;
-  size_t offset = 0;
-
-  for (const ROSField* field : fields) {
-    const std::string& str = field->name();
-    bool is_root = (field == fields.front());
-    if (!is_root) {
-      buffer[offset++] = '/';
-    }
-    std::memcpy(&buffer[offset], str.data(), str.size());
-    offset += str.size();
-
-    if (!is_root && field->isArray()) {
-      buffer[offset++] = '[';
-      if (array_count < index_array.size()) {
-        offset += print_number(&buffer[offset], index_array[array_count++]);
-      }
-      buffer[offset++] = ']';
-    }
+  if (num_brackets == 0) {
+    out = tmpl;
+    return;
   }
-  buffer[offset] = '\0';
-  out.resize(offset);
+
+  size_t extra = index_array.size() * 5;
+  out.resize(tmpl.size() + extra);
+  char* buf = out.data();
+  const char* src = tmpl.data();
+
+  size_t out_off = 0;
+  size_t src_off = 0;
+  const uint16_t* offsets = _node->bracketOffsets();
+
+  for (uint8_t i = 0; i < num_brackets; i++) {
+    size_t seg_len = offsets[i] - src_off;
+    std::memcpy(buf + out_off, src + src_off, seg_len);
+    out_off += seg_len;
+
+    buf[out_off++] = '[';
+    if (i < index_array.size()) {
+      out_off += print_number(buf + out_off, index_array[i]);
+    }
+    buf[out_off++] = ']';
+    src_off = offsets[i] + 2;
+  }
+
+  size_t tail_len = tmpl.size() - src_off;
+  if (tail_len > 0) {
+    std::memcpy(buf + out_off, src + src_off, tail_len);
+    out_off += tail_len;
+  }
+
+  out.resize(out_off);
 }
-
-// void CreateStringFromTreeLeaf(const FieldTreeLeaf &leaf, bool skip_root, std::string&
-// out)
-//{
-//   const FieldTreeNode* leaf_node = leaf.node_ptr;
-//   if( !leaf_node ){
-//       out.clear();
-//       return ;
-//   }
-
-//  SmallVector<const std::string*, 16> strings_chain;
-
-//  size_t total_size = 0;
-
-//  while(leaf_node)
-//  {
-//    const auto& str = leaf_node->value()->name();
-//    leaf_node = leaf_node->parent();
-//    if( !( leaf_node == nullptr && skip_root) )
-//    {
-//        strings_chain.emplace_back( &str );
-//        const size_t S = str.size();
-//        if( S == 1 && str[0] == '#' )
-//        {
-//            total_size += 5; // super conservative
-//        }
-//        else{
-//          total_size += S+1;
-//        }
-//    }
-//  };
-
-//  out.resize(total_size);
-//  char* buffer = &out[0];
-
-//  std::reverse(strings_chain.begin(),  strings_chain.end() );
-
-//  size_t array_count = 0;
-//  size_t offset = 0;
-
-//  for( const auto& str: strings_chain)
-//  {
-//    const size_t S = str->size();
-//    if( S == 1 && (*str)[0] == '#' )
-//    {
-//      buffer[offset++] = '.';
-//      offset += print_number(&buffer[offset], leaf.index_array[ array_count++ ] );
-//    }
-//    else{
-//      if( str !=  strings_chain.front() ){
-//        buffer[offset++] = '/';
-//      }
-//      std::memcpy( &buffer[offset], str->data(), S );
-//      offset += S;
-//    }
-//  }
-//  out.resize(offset);
-//}
 
 }  // namespace RosMsgParser

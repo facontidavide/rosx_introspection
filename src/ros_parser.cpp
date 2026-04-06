@@ -74,140 +74,133 @@ inline void ExpandVectorIfNecessary(Container& container, size_t new_size) {
   }
 }
 
+void Parser::deserializeImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, DeserializeState& state) const {
+  auto* deserializer = state.deserializer;
+  size_t index_s = 0;
+
+  const auto* saved_node = leaf.node;
+  const auto saved_idx_size = leaf.index_array.size();
+
+  for (const ROSField& field : msg->fields()) {
+    bool DO_STORE = store;
+    if (field.isConstant()) {
+      continue;
+    }
+
+    const ROSType& field_type = field.type();
+
+    leaf.node = saved_node->child(index_s);
+
+    int32_t array_size = field.arraySize();
+    if (array_size == -1) {
+      array_size = deserializer->deserializeUInt32();
+    }
+    if (field.isArray()) {
+      leaf.index_array.push_back(0);
+    }
+
+    bool IS_BLOB = false;
+
+    if (array_size > static_cast<int32_t>(_max_array_size)) {
+      if (builtinSize(field_type.typeID()) == 1) {
+        IS_BLOB = true;
+      } else {
+        if (_discard_large_array) {
+          DO_STORE = false;
+        }
+        state.entire_message_parsed = false;
+      }
+    }
+
+    if (IS_BLOB) {
+      ExpandVectorIfNecessary(state.flat->blob, state.blob_index);
+
+      if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
+        throw std::runtime_error("Buffer overrun in deserialize (blob)");
+      }
+      if (DO_STORE) {
+        state.flat->blob[state.blob_index].first = FieldsVector(leaf);
+        auto& blob = state.flat->blob[state.blob_index].second;
+        state.blob_index++;
+
+        if (_blob_policy == STORE_BLOB_AS_COPY) {
+          ExpandVectorIfNecessary(state.flat->blob_storage, state.blob_storage_index);
+
+          auto& storage = state.flat->blob_storage[state.blob_storage_index];
+          storage.resize(array_size);
+          std::memcpy(storage.data(), deserializer->getCurrentPtr(), array_size);
+          state.blob_storage_index++;
+
+          blob = Span<const uint8_t>(storage.data(), storage.size());
+        } else {
+          blob = Span<const uint8_t>(deserializer->getCurrentPtr(), array_size);
+        }
+      }
+      deserializer->jump(array_size);
+    } else {
+      bool DO_STORE_ARRAY = DO_STORE;
+      for (int i = 0; i < array_size; i++) {
+        if (DO_STORE_ARRAY && i >= static_cast<int32_t>(_max_array_size)) {
+          DO_STORE_ARRAY = false;
+        }
+
+        if (field.isArray() && DO_STORE_ARRAY) {
+          leaf.index_array.back() = i;
+        }
+
+        if (field_type.typeID() == STRING) {
+          ExpandVectorIfNecessary(state.flat->value, state.value_index);
+
+          std::string str;
+          deserializer->deserializeString(str);
+
+          if (DO_STORE_ARRAY) {
+            state.flat->value[state.value_index].first = FieldsVector(leaf);
+            state.flat->value[state.value_index].second = str;
+            state.value_index++;
+          }
+        } else if (field_type.isBuiltin()) {
+          ExpandVectorIfNecessary(state.flat->value, state.value_index);
+
+          Variant var = deserializer->deserialize(field_type.typeID());
+          if (DO_STORE_ARRAY) {
+            state.flat->value[state.value_index] = std::make_pair(FieldsVector(leaf), std::move(var));
+            state.value_index++;
+          }
+        } else {
+          auto msg_node = field.getMessagePtr(_schema->msg_library);
+          deserializeImpl(msg_node.get(), leaf, DO_STORE_ARRAY, state);
+        }
+      }
+    }
+
+    leaf.index_array.resize(saved_idx_size);
+    index_s++;
+  }
+
+  leaf.node = saved_node;
+}
+
 bool Parser::deserialize(Span<const uint8_t> buffer, FlatMessage* flat_container, Deserializer* deserializer) const {
   deserializer->init(buffer);
 
-  bool entire_message_parse = true;
-
-  size_t value_index = 0;
-  size_t blob_index = 0;
-  size_t blob_storage_index = 0;
-
-  std::function<void(const ROSMessage*, FieldLeaf, bool)> deserializeImpl;
-
-  deserializeImpl = [&](const ROSMessage* msg, FieldLeaf tree_leaf, bool store) {
-    size_t index_s = 0;
-    size_t index_m = 0;
-
-    for (const ROSField& field : msg->fields()) {
-      bool DO_STORE = store;
-      if (field.isConstant()) {
-        continue;
-      }
-
-      const ROSType& field_type = field.type();
-
-      auto new_tree_leaf = tree_leaf;
-      new_tree_leaf.node = tree_leaf.node->child(index_s);
-
-      int32_t array_size = field.arraySize();
-      if (array_size == -1) {
-        array_size = deserializer->deserializeUInt32();
-      }
-      if (field.isArray()) {
-        new_tree_leaf.index_array.push_back(0);
-      }
-
-      bool IS_BLOB = false;
-
-      // Stop storing it if is NOT a blob and a very large array.
-      if (array_size > static_cast<int32_t>(_max_array_size)) {
-        if (builtinSize(field_type.typeID()) == 1) {
-          IS_BLOB = true;
-        } else {
-          if (_discard_large_array) {
-            DO_STORE = false;
-          }
-          entire_message_parse = false;
-        }
-      }
-      // special case. This is a "blob", typically an image, a map, pointcloud, etc.
-      if (IS_BLOB) {
-        ExpandVectorIfNecessary(flat_container->blob, blob_index);
-
-        if (array_size > static_cast<int32_t>(deserializer->bytesLeft())) {
-          throw std::runtime_error(
-              "Buffer overrun in deserializeIntoFlatContainer "
-              "(blob)");
-        }
-        if (DO_STORE) {
-          flat_container->blob[blob_index].first = FieldsVector(new_tree_leaf);
-          auto& blob = flat_container->blob[blob_index].second;
-          blob_index++;
-
-          if (_blob_policy == STORE_BLOB_AS_COPY) {
-            ExpandVectorIfNecessary(flat_container->blob_storage, blob_storage_index);
-
-            auto& storage = flat_container->blob_storage[blob_storage_index];
-            storage.resize(array_size);
-            std::memcpy(storage.data(), deserializer->getCurrentPtr(), array_size);
-            blob_storage_index++;
-
-            blob = Span<const uint8_t>(storage.data(), storage.size());
-          } else {
-            blob = Span<const uint8_t>(deserializer->getCurrentPtr(), array_size);
-          }
-        }
-        deserializer->jump(array_size);
-      } else  // NOT a BLOB
-      {
-        bool DO_STORE_ARRAY = DO_STORE;
-        for (int i = 0; i < array_size; i++) {
-          if (DO_STORE_ARRAY && i >= static_cast<int32_t>(_max_array_size)) {
-            DO_STORE_ARRAY = false;
-          }
-
-          if (field.isArray() && DO_STORE_ARRAY) {
-            new_tree_leaf.index_array.back() = i;
-          }
-
-          if (field_type.typeID() == STRING) {
-            ExpandVectorIfNecessary(flat_container->value, value_index);
-
-            std::string str;
-            deserializer->deserializeString(str);
-
-            if (DO_STORE_ARRAY) {
-              flat_container->value[value_index].first = FieldsVector(new_tree_leaf);
-              flat_container->value[value_index].second = str;
-              value_index++;
-            }
-          } else if (field_type.isBuiltin()) {
-            ExpandVectorIfNecessary(flat_container->value, value_index);
-
-            Variant var = deserializer->deserialize(field_type.typeID());
-            if (DO_STORE_ARRAY) {
-              flat_container->value[value_index] = std::make_pair(new_tree_leaf, std::move(var));
-              value_index++;
-            }
-          } else {  // field_type.typeID() == OTHER
-            auto msg_node = field.getMessagePtr(_schema->msg_library);
-            deserializeImpl(msg_node.get(), new_tree_leaf, DO_STORE_ARRAY);
-          }
-        }  // end for array_size
-      }
-
-      if (field_type.typeID() == OTHER) {
-        index_m++;
-      }
-      index_s++;
-    }  // end for fields
-  };   // end of lambda
-
-  // pass the shared_ptr
   flat_container->schema = _schema;
+
+  DeserializeState state;
+  state.flat = flat_container;
+  state.deserializer = deserializer;
 
   FieldLeaf rootnode;
   rootnode.node = _schema->field_tree.croot();
   auto root_msg = _schema->field_tree.croot()->value()->getMessagePtr(_schema->msg_library);
 
-  deserializeImpl(root_msg.get(), rootnode, true);
+  deserializeImpl(root_msg.get(), rootnode, true, state);
 
-  flat_container->value.resize(value_index);
-  flat_container->blob.resize(blob_index);
-  flat_container->blob_storage.resize(blob_storage_index);
+  flat_container->value.resize(state.value_index);
+  flat_container->blob.resize(state.blob_index);
+  flat_container->blob_storage.resize(state.blob_storage_index);
 
-  return entire_message_parse;
+  return state.entire_message_parsed;
 }
 
 #ifndef ROSX_HAS_JSON

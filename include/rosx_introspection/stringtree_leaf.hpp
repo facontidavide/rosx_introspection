@@ -86,7 +86,6 @@ struct FieldsVector {
 
   FieldsVector(const FieldLeaf& leaf);
 
-  SmallVector<const ROSField*, 8> fields;
   SmallVector<uint16_t, 4> index_array;
 
   /// Utility functions to print the entire branch
@@ -97,6 +96,9 @@ struct FieldsVector {
     toStr(out);
     return out;
   }
+
+ private:
+  const FieldTreeNode* _node = nullptr;
 };
 
 //---------------------------------

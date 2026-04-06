@@ -184,7 +184,35 @@ MessageSchema::Ptr BuildMessageSchema(const std::string& topic_name, const std::
 
   recursiveTreeCreator(schema->root_msg, schema->field_tree.root());
 
+  CacheFieldTreePaths(schema->field_tree);
+
   return schema;
+}
+
+static void cachePathsImpl(FieldTreeNode* node, const std::string& parent_path, bool is_root) {
+  const ROSField* field = node->value();
+  std::string path;
+  if (field) {
+    if (is_root) {
+      path = field->name();
+    } else {
+      path.reserve(parent_path.size() + 1 + field->name().size() + 12);
+      path = parent_path;
+      path += '/';
+      path += field->name();
+      if (field->isArray()) {
+        path += "[]";
+      }
+    }
+  }
+  node->setCachedPath(path);
+  for (auto& child : node->children()) {
+    cachePathsImpl(&child, path, false);
+  }
+}
+
+void CacheFieldTreePaths(FieldTree& tree) {
+  cachePathsImpl(tree.root(), "", true);
 }
 
 }  // namespace RosMsgParser

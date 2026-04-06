@@ -88,22 +88,24 @@ if(BUILD_TESTING)
     enable_testing()
 
     if(USING_ROS2)
-        find_package(sensor_msgs REQUIRED)
-        find_package(geometry_msgs REQUIRED)
-        find_package(ament_cmake_gtest REQUIRED)
+        find_package(ament_cmake_gtest QUIET)
+        if(ament_cmake_gtest_FOUND)
+            find_package(sensor_msgs REQUIRED)
+            find_package(geometry_msgs REQUIRED)
 
-        ament_add_gtest(rosx_introspection_test
-            test/test_parser.cpp
-            test/test_ros2.cpp )
+            ament_add_gtest(rosx_introspection_test
+                test/test_parser.cpp
+                test/test_ros2.cpp )
 
-        target_link_libraries(rosx_introspection_test
-            rosx_introspection
-            ${sensor_msgs_TARGETS}
-            ${geometry_msgs_TARGETS}
-            )
+            target_link_libraries(rosx_introspection_test
+                rosx_introspection
+                ${sensor_msgs_TARGETS}
+                ${geometry_msgs_TARGETS}
+                )
 
-        target_include_directories(rosx_introspection_test PUBLIC
-                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+            target_include_directories(rosx_introspection_test PUBLIC
+                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+        endif()
     endif(USING_ROS2)
 
     find_package(GTest REQUIRED)
