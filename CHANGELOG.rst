@@ -2,6 +2,18 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Add Ubuntu CI workflow for non-ROS builds
+* Use ament_cmake_gtest for tests in ROS2 builds
+* Fix review issues: throw on bracket overflow, fix reserve, use num_brackets for estimate
+* Split CI into per-distro workflows and add badges to README
+* Add Rolling to CI matrix
+* Add Kilted to CI matrix and bump checkout to v4
+* Optimize toStr with precomputed path templates and segment table
+* Make MCAP benchmark ROS-independent and add enable_testing()
+* Contributors: Davide Faconti
+
 2.2.1 (2026-04-06)
 ------------------
 * Merge pull request `#39 <https://github.com/facontidavide/rosx_introspection//issues/39>`_ from gasmith/fix-test-deps
