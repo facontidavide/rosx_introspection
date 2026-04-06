@@ -2,6 +2,13 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#39 <https://github.com/facontidavide/rosx_introspection//issues/39>`_ from gasmith/fix-test-deps
+* cmake: Don't export test dependencies to downstream consumers
+* Update variant.hpp
+* Contributors: Davide Faconti, Greg Smith
+
 2.1.0 (2026-02-21)
 ------------------
 * Fix multiple bugs in serialization, deserialization, and JSON handling
