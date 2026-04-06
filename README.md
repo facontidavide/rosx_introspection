@@ -12,7 +12,15 @@ into key/value pairs without compile-time type knowledge.
 ## Supported schema formats
 
 - **ROS .msg** (ROS1 and ROS2 message definitions)
-- **DDS IDL** (OMG IDL 4.2 subset) -- including enums, unions, `@key`, `@optional`, multi-dimensional arrays, and struct inheritance.
+- **DDS IDL** (OMG IDL 4.2 subset)
+
+The subset the OMG IDL currently supported are:
+
+- enums
+- unions
+- `@key` and `@optional`
+- multi-dimensional arrays
+- struct inheritance
 
 ## Build modes
 
@@ -56,7 +64,7 @@ Custom writers can be implemented by subclassing `MessageWriter`.
 
 ```bash
 # Standalone build (no ROS)
-cmake -S. -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake -S. -B build -DBUILD_TESTING=ON
 cmake --build build
 ctest --test-dir build
 ```
@@ -66,13 +74,13 @@ ctest --test-dir build
 The MCAP benchmark measures deserialization throughput on real bag files:
 
 ```bash
-cmake -S. -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKS=ON
+cmake -S. -B build -DBUILD_BENCHMARKS=ON
 cmake --build build
 
 # Run with different output writers
-./build/mcap_benchmark path/to/file.mcap --iterations 5 --writer flat
-./build/mcap_benchmark path/to/file.mcap --iterations 5 --writer msgpack
-./build/mcap_benchmark path/to/file.mcap --iterations 5 --writer json
+./build/mcap_benchmark path/to/file.mcap --writer flat
+./build/mcap_benchmark path/to/file.mcap --writer msgpack
+./build/mcap_benchmark path/to/file.mcap --writer json
 ```
 
 The IDL benchmark measures CDR deserialization performance:
@@ -84,7 +92,7 @@ The IDL benchmark measures CDR deserialization performance:
 ## Python binding
 
 ```bash
-cmake -S. -B build_python -DCMAKE_BUILD_TYPE=Release -DROSX_PYTHON_BINDINGS=ON
+cmake -S. -B build_python -DROSX_PYTHON_BINDINGS=ON
 cmake --build build_python
 
 PYTHONPATH=build_python/python python3 python/mcap_ros_parser.py path_to_your_rosbag.mcap
