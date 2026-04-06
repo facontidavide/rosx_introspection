@@ -2,8 +2,8 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+2.2.1 (2026-04-06)
+------------------
 * Merge pull request `#39 <https://github.com/facontidavide/rosx_introspection//issues/39>`_ from gasmith/fix-test-deps
 * cmake: Don't export test dependencies to downstream consumers
 * Update variant.hpp
