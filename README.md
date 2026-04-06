@@ -1,5 +1,6 @@
 # ROS X Introspection
 
+[![Ubuntu](https://github.com/facontidavide/rosx_introspection/actions/workflows/ubuntu.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/ubuntu.yaml)
 [![Humble](https://github.com/facontidavide/rosx_introspection/actions/workflows/humble.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/humble.yaml)
 [![Jazzy](https://github.com/facontidavide/rosx_introspection/actions/workflows/jazzy.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/jazzy.yaml)
 [![Kilted](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml)
