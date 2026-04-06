@@ -6,47 +6,84 @@
 [![Kilted](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml)
 [![Rolling](https://github.com/facontidavide/rosx_introspection/actions/workflows/rolling.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/rolling.yaml)
 
-Unified successor of the following libraries:
+A runtime message parser and introspection library for ROS. It can deserialize any ROS message
+into key/value pairs without compile-time type knowledge.
 
-- [ros_type_introspection](https://github.com/facontidavide/ros_type_introspection)
-- [ros_msg_parser](https://github.com/facontidavide/ros_msg_parser)
-- [ros2_introspection](https://github.com/facontidavide/ros2_introspection)
+## Supported schema formats
 
-The library compiles either using:
-- ROS1 (catkin),
-- ROS2 (colcon/ament) or
-- without any ROS dependency (vanilla cmake).
+- **ROS .msg** (ROS1 and ROS2 message definitions)
+- **DDS IDL** (OMG IDL 4.2 subset) -- including enums, unions, `@key`, `@optional`, multi-dimensional arrays, and struct inheritance.
 
-To parse any ROS message at runtime, it requires:
+## Build modes
 
-- The name of the type (for instance "sensors_msgs/JointState")
-- The definition of the type
-  (for instance [this one](http://docs.ros.org/en/noetic/api/sensor_msgs/html/msg/JointState.html)),
-- The raw memory buffer to be deserialized into individual key/values pairs.
+The library compiles in three modes:
 
-The raw memory buffer is usually obtained by:
+- **ROS1** (catkin)
+- **ROS2** (colcon/ament)
+- **Standalone** (vanilla CMake, no ROS dependency)
 
-- [rosbag::MessageInstance](https://docs.ros.org/en/noetic/api/rosbag_storage/html/c++/classrosbag_1_1MessageInstance.html) and
-  [Topic::ShapeShifter](http://docs.ros.org/en/noetic/api/topic_tools/html/shape__shifter_8h.html)
-  in **ROS1**.
-- [GenericSubscriber](https://github.com/ros2/rclcpp/blob/rolling/rclcpp/src/rclcpp/generic_subscription.cpp)
-  or `rosbag2_storage::SerializedBagMessage` on **ROS2**.
-- [MCAP](https://github.com/foxglove/mcap).
+## How it works
 
+To parse a message at runtime, you need:
 
-# Python binding
+1. The **type name** (e.g. `sensor_msgs/JointState` or `my_pkg::MyIdlMessage`)
+2. The **schema definition** (a `.msg` file or IDL text)
+3. A **raw memory buffer** containing the serialized message
 
-Compilation instructions:
+The raw buffer is typically obtained from:
 
+- [rosbag::MessageInstance](https://docs.ros.org/en/noetic/api/rosbag_storage/html/c++/classrosbag_1_1MessageInstance.html)
+  or [topic_tools::ShapeShifter](http://docs.ros.org/en/noetic/api/topic_tools/html/shape__shifter_8h.html) in **ROS1**.
+- [GenericSubscription](https://github.com/ros2/rclcpp/blob/rolling/rclcpp/src/rclcpp/generic_subscription.cpp)
+  or `rosbag2_storage::SerializedBagMessage` in **ROS2**.
+- [MCAP](https://github.com/foxglove/mcap) files (works without ROS).
+
+## Output writers
+
+The `MessageWriter` interface allows different output formats from the same deserialization walk:
+
+| Writer | Description |
+|--------|-------------|
+| `FlatMessageWriter` | Produces a `FlatMessage` (vector of key/value pairs). Default output. |
+| `MsgpackMessageWriter` | Writes MessagePack binary directly, bypassing `FlatMessage`. |
+| `JsonMessageWriter` | Produces a JSON document (requires `ROSX_HAS_JSON=ON`). |
+
+Custom writers can be implemented by subclassing `MessageWriter`.
+
+## Building and testing
+
+```bash
+# Standalone build (no ROS)
+cmake -S. -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build
 ```
+
+### Benchmarks
+
+The MCAP benchmark measures deserialization throughput on real bag files:
+
+```bash
+cmake -S. -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_BENCHMARKS=ON
+cmake --build build
+
+# Run with different output writers
+./build/mcap_benchmark path/to/file.mcap --iterations 5 --writer flat
+./build/mcap_benchmark path/to/file.mcap --iterations 5 --writer msgpack
+./build/mcap_benchmark path/to/file.mcap --iterations 5 --writer json
+```
+
+The IDL benchmark measures CDR deserialization performance:
+
+```bash
+./build/idl_benchmark
+```
+
+## Python binding
+
+```bash
 cmake -S. -B build_python -DCMAKE_BUILD_TYPE=Release -DROSX_PYTHON_BINDINGS=ON
 cmake --build build_python
-```
 
-If you have a rosbag (MCAP file) you can test it with this command
-
-```
 PYTHONPATH=build_python/python python3 python/mcap_ros_parser.py path_to_your_rosbag.mcap
 ```
-
-Note that we are providing the folder where the dynamic library is using **PYTHONPATH**.
