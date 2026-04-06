@@ -46,6 +46,10 @@ target_include_directories(rosx_introspection PUBLIC
     $<INSTALL_INTERFACE:include>)
 target_compile_features(rosx_introspection PUBLIC cxx_std_17)
 
+# Always use the nonstd span implementation to guarantee ABI compatibility
+# when downstream consumers compile with C++20 (where std::span exists).
+target_compile_definitions(rosx_introspection PUBLIC span_CONFIG_SELECT_SPAN=1)
+
 if(USING_ROS2)
     target_link_libraries(rosx_introspection PUBLIC
         ament_index_cpp::ament_index_cpp
