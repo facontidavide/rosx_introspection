@@ -16,11 +16,13 @@ into key/value pairs without compile-time type knowledge.
 
 ## Build modes
 
-The library compiles in three modes:
+The library compiles in two modes:
 
-- **ROS1** (catkin)
 - **ROS2** (colcon/ament)
 - **Standalone** (vanilla CMake, no ROS dependency)
+
+ROS1 `.msg` schemas and the ROS1 serialization format (`ROS_Deserializer`) are still supported at runtime,
+but the catkin build system is no longer maintained.
 
 ## How it works
 
