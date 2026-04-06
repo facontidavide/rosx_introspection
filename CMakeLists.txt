@@ -37,6 +37,8 @@ add_library(rosx_introspection
     src/ros_parser.cpp
     src/deserializer.cpp
     src/serializer.cpp
+    src/flat_message_writer.cpp
+    src/json_schema_writer.cpp
     src/msgpack_utils.cpp
     src/idl_parser.cpp
     ${EXTRA_SRC}
@@ -45,11 +47,8 @@ add_library(rosx_introspection
 target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-target_compile_features(rosx_introspection PUBLIC cxx_std_17)
+target_compile_features(rosx_introspection PUBLIC cxx_std_20)
 
-# Always use the nonstd span implementation to guarantee ABI compatibility
-# when downstream consumers compile with C++20 (where std::span exists).
-target_compile_definitions(rosx_introspection PUBLIC span_CONFIG_SELECT_SPAN=1)
 
 if(USING_ROS2)
     target_link_libraries(rosx_introspection PUBLIC

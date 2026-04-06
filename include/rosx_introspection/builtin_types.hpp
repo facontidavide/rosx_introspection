@@ -29,12 +29,12 @@
 #include <string>
 
 #include "rosx_introspection/contrib/SmallVector.h"
-#include "rosx_introspection/contrib/span.hpp"
+#include <span>
 
 namespace RosMsgParser {
 
 template <class T>
-using Span = nonstd::span<T>;
+using Span = std::span<T>;
 
 template <class T, size_t N>
 using SmallVector = llvm_vecsmall::SmallVector<T, N>;

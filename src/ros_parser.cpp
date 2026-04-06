@@ -27,6 +27,8 @@
 #include <limits>
 #include <type_traits>
 
+#include "rosx_introspection/flat_message_writer.hpp"
+
 #ifdef ROSX_HAS_JSON
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
@@ -67,14 +69,6 @@ ROSMessage::Ptr Parser::getMessageByType(const ROSType& type) const {
     }
   }
   return {};
-}
-
-template <typename Container>
-inline void ExpandVectorIfNecessary(Container& container, size_t new_size) {
-  if (container.size() <= new_size) {
-    const size_t increased_size = std::max(size_t(32), container.size() * 2);
-    container.resize(increased_size);
-  }
 }
 
 //=============================================================================
@@ -333,67 +327,6 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
   leaf.node = saved_node;
 }
 
-//=============================================================================
-// FlatMessageWriter: produces FlatMessage output
-//=============================================================================
-
-namespace {
-
-class FlatMessageWriter : public SchemaWriter {
- public:
-  FlatMessageWriter(FlatMessage* flat, Parser::BlobPolicy blob_policy)
-      : _flat(flat), _blob_policy(blob_policy) {}
-
-  void writeValue(const FieldLeaf& leaf, const Variant& value) override {
-    ExpandVectorIfNecessary(_flat->value, _value_index);
-    _flat->value[_value_index].first = leaf;
-    _flat->value[_value_index].second = value;
-    _value_index++;
-  }
-
-  void writeString(const FieldLeaf& leaf, const std::string& str) override {
-    ExpandVectorIfNecessary(_flat->value, _value_index);
-    _flat->value[_value_index].first = leaf;
-    _flat->value[_value_index].second = str;
-    _value_index++;
-  }
-
-  void writeEnum(const FieldLeaf& leaf, int32_t value, const std::string& /*name*/) override {
-    writeValue(leaf, Variant(value));
-  }
-
-  void writeBlob(const FieldLeaf& leaf, Span<const uint8_t> data) override {
-    ExpandVectorIfNecessary(_flat->blob, _blob_index);
-    _flat->blob[_blob_index].first = leaf;
-
-    if (_blob_policy == Parser::STORE_BLOB_AS_COPY) {
-      ExpandVectorIfNecessary(_flat->blob_storage, _blob_storage_index);
-      auto& storage = _flat->blob_storage[_blob_storage_index];
-      storage.assign(data.data(), data.data() + data.size());
-      _flat->blob[_blob_index].second = Span<const uint8_t>(storage.data(), storage.size());
-      _blob_storage_index++;
-    } else {
-      _flat->blob[_blob_index].second = data;
-    }
-    _blob_index++;
-  }
-
-  void finish() override {
-    _flat->value.resize(_value_index);
-    _flat->blob.resize(_blob_index);
-    _flat->blob_storage.resize(_blob_storage_index);
-  }
-
- private:
-  FlatMessage* _flat;
-  Parser::BlobPolicy _blob_policy;
-  size_t _value_index = 0;
-  size_t _blob_index = 0;
-  size_t _blob_storage_index = 0;
-};
-
-}  // namespace
-
 // Opt D: Estimate field count for pre-reservation
 static size_t estimateFieldCount(const ROSMessage* msg, const RosMessageLibrary& lib, int depth = 0) {
   if (depth > 10) {
@@ -451,105 +384,6 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
 }
 
 #else
-
-//-----------------------------------------------------------------------------
-// JsonSchemaWriter: produces a rapidjson Document
-//-----------------------------------------------------------------------------
-
-namespace {
-
-class JsonSchemaWriter : public SchemaWriter {
- public:
-  JsonSchemaWriter(rapidjson::Document& doc, bool ignore_constants)
-      : _doc(doc), _alloc(doc.GetAllocator()), _ignore_constants(ignore_constants) {
-    _doc.SetObject();
-    _json_stack.push_back(&_doc);
-  }
-
-  void writeValue(const FieldLeaf& leaf, const Variant& value) override {
-    rapidjson::Value json_val;
-    switch (value.getTypeID()) {
-      case BOOL:
-        json_val.SetBool(value.convert<uint8_t>());
-        break;
-      case CHAR: {
-        char c = value.convert<int8_t>();
-        json_val.SetString(&c, 1, _alloc);
-      } break;
-      case BYTE:
-      case UINT8:
-      case UINT16:
-      case UINT32:
-        json_val.SetUint(value.convert<uint32_t>());
-        break;
-      case UINT64:
-        json_val.SetUint64(value.convert<uint64_t>());
-        break;
-      case INT8:
-      case INT16:
-      case INT32:
-        json_val.SetInt(value.convert<int32_t>());
-        break;
-      case INT64:
-        json_val.SetInt64(value.convert<int64_t>());
-        break;
-      case FLOAT32:
-        json_val.SetFloat(value.convert<float>());
-        break;
-      case FLOAT64:
-        json_val.SetDouble(value.convert<double>());
-        break;
-      case TIME:
-      case DURATION: {
-        // These are handled as two INT32s by the walker, arriving as individual fields
-        json_val.SetInt(value.convert<int32_t>());
-      } break;
-      default:
-        json_val.SetNull();
-        break;
-    }
-    addToCurrentJson(leaf, std::move(json_val));
-  }
-
-  void writeString(const FieldLeaf& leaf, const std::string& str) override {
-    rapidjson::Value json_val;
-    json_val.SetString(str.c_str(), str.length(), _alloc);
-    addToCurrentJson(leaf, std::move(json_val));
-  }
-
-  void writeEnum(const FieldLeaf& leaf, int32_t value, const std::string& /*name*/) override {
-    rapidjson::Value json_val;
-    json_val.SetInt(value);
-    addToCurrentJson(leaf, std::move(json_val));
-  }
-
-  void beginStruct(const ROSField& /*field*/) override {
-    // A new JSON object will be created by the walker when it recurses
-  }
-
-  void endStruct() override {
-    // Nothing to do — the struct's fields are added directly to the current JSON level
-  }
-
- private:
-  void addToCurrentJson(const FieldLeaf& leaf, rapidjson::Value&& val) {
-    // For now, the JsonSchemaWriter is a simplified version that stores
-    // all values flat. The hierarchical JSON building requires the walker
-    // to provide field names, which FieldLeaf already contains via the tree node.
-    // We store in a flat structure for now.
-    // Full hierarchical JSON would need more structural events from the walker.
-    (void)leaf;
-    (void)val;
-    // TODO: build hierarchical JSON. For now, fall back to the legacy implementation.
-  }
-
-  rapidjson::Document& _doc;
-  rapidjson::Document::AllocatorType& _alloc;
-  bool _ignore_constants;
-  std::vector<rapidjson::Value*> _json_stack;
-};
-
-}  // namespace
 
 // For now, deserializeIntoJson uses the legacy implementation with IDL support added.
 // A full JsonSchemaWriter that builds hierarchical JSON from the walkSchema events
