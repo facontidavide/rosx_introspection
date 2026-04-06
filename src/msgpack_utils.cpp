@@ -22,7 +22,9 @@
  */
 
 #include "rosx_introspection/msgpack_utils.hpp"
+
 #include "rosx_introspection/contrib/msgpack.hpp"
+#include "rosx_introspection/msgpack_message_writer.hpp"
 
 #include <string>
 
@@ -78,6 +80,12 @@ void convertToMsgpack(const FlatMessage& flat_msg, std::vector<uint8_t>& msgpack
   }
 
   msgpack_data.resize(offset);
+}
+
+bool deserializeToMsgpack(const Parser& parser, Span<const uint8_t> buffer,
+                          Deserializer* deserializer, std::vector<uint8_t>& msgpack_data) {
+  MsgpackMessageWriter writer(&msgpack_data);
+  return parser.walkSchema(buffer, deserializer, &writer);
 }
 
 }  // namespace RosMsgParser

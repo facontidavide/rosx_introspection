@@ -38,8 +38,9 @@ add_library(rosx_introspection
     src/deserializer.cpp
     src/serializer.cpp
     src/flat_message_writer.cpp
-    src/json_schema_writer.cpp
+    src/json_message_writer.cpp
     src/msgpack_utils.cpp
+    src/msgpack_message_writer.cpp
     src/idl_parser.cpp
     ${EXTRA_SRC}
     )

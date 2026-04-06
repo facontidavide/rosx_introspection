@@ -763,7 +763,7 @@ TEST(IDLParser, Comments) {
 }
 
 // ============================================================
-// walkSchema / SchemaWriter tests
+// walkSchema / MessageWriter tests
 // ============================================================
 
 // Test that walkSchema with FlatMessageWriter produces same results as old deserialize

@@ -9,9 +9,9 @@ class ROSField;
 /// Abstract interface for consuming deserialized schema values.
 /// Implement this to produce different output formats (FlatMessage, JSON, msgpack, etc.)
 /// from the same schema walk.
-class SchemaWriter {
+class MessageWriter {
  public:
-  virtual ~SchemaWriter() = default;
+  virtual ~MessageWriter() = default;
 
   /// Called for each scalar/builtin value (not string, not enum)
   virtual void writeValue(const FieldLeaf& leaf, const Variant& value) = 0;

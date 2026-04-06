@@ -2,14 +2,14 @@
 
 #include <memory>
 
-#include "rosx_introspection/schema_writer.hpp"
+#include "rosx_introspection/message_writer.hpp"
 
 namespace RosMsgParser {
 
 struct FlatMessage;
 class Parser;
 
-class FlatMessageWriter : public SchemaWriter {
+class FlatMessageWriter : public MessageWriter {
  public:
   FlatMessageWriter(FlatMessage* flat, int blob_policy);
   ~FlatMessageWriter() override;

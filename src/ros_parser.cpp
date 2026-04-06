@@ -75,7 +75,7 @@ ROSMessage::Ptr Parser::getMessageByType(const ROSType& type) const {
 // Unified schema walk: walkSchema()
 //=============================================================================
 
-bool Parser::walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, SchemaWriter* writer) const {
+bool Parser::walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, MessageWriter* writer) const {
   deserializer->init(buffer);
 
   WalkState state;
@@ -386,7 +386,7 @@ bool Parser::serializeFromJson(const std::string_view json_string, Serializer* s
 #else
 
 // For now, deserializeIntoJson uses the legacy implementation with IDL support added.
-// A full JsonSchemaWriter that builds hierarchical JSON from the walkSchema events
+// A full JsonMessageWriter that builds hierarchical JSON from the walkSchema events
 // is planned as a follow-up.
 bool Parser::deserializeIntoJson(
     Span<const uint8_t> buffer, std::string* json_txt, Deserializer* deserializer, int indent,

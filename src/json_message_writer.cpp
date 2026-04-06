@@ -1,4 +1,4 @@
-#include "rosx_introspection/json_schema_writer.hpp"
+#include "rosx_introspection/json_message_writer.hpp"
 
 #ifdef ROSX_HAS_JSON
 
@@ -11,7 +11,7 @@
 
 namespace RosMsgParser {
 
-struct JsonSchemaWriter::Impl {
+struct JsonMessageWriter::Impl {
   rapidjson::Document& doc;
   rapidjson::Document::AllocatorType& alloc;
   bool ignore_constants;
@@ -30,12 +30,12 @@ struct JsonSchemaWriter::Impl {
   }
 };
 
-JsonSchemaWriter::JsonSchemaWriter(void* doc, bool ignore_constants)
+JsonMessageWriter::JsonMessageWriter(void* doc, bool ignore_constants)
     : _impl(std::make_unique<Impl>(*static_cast<rapidjson::Document*>(doc), ignore_constants)) {}
 
-JsonSchemaWriter::~JsonSchemaWriter() = default;
+JsonMessageWriter::~JsonMessageWriter() = default;
 
-void JsonSchemaWriter::writeValue(const FieldLeaf& leaf, const Variant& value) {
+void JsonMessageWriter::writeValue(const FieldLeaf& leaf, const Variant& value) {
   rapidjson::Value json_val;
   switch (value.getTypeID()) {
     case BOOL:
@@ -79,21 +79,21 @@ void JsonSchemaWriter::writeValue(const FieldLeaf& leaf, const Variant& value) {
   _impl->addToCurrentJson(leaf, std::move(json_val));
 }
 
-void JsonSchemaWriter::writeString(const FieldLeaf& leaf, const std::string& str) {
+void JsonMessageWriter::writeString(const FieldLeaf& leaf, const std::string& str) {
   rapidjson::Value json_val;
   json_val.SetString(str.c_str(), str.length(), _impl->alloc);
   _impl->addToCurrentJson(leaf, std::move(json_val));
 }
 
-void JsonSchemaWriter::writeEnum(const FieldLeaf& leaf, int32_t value, const std::string& /*name*/) {
+void JsonMessageWriter::writeEnum(const FieldLeaf& leaf, int32_t value, const std::string& /*name*/) {
   rapidjson::Value json_val;
   json_val.SetInt(value);
   _impl->addToCurrentJson(leaf, std::move(json_val));
 }
 
-void JsonSchemaWriter::beginStruct(const ROSField& /*field*/) {}
+void JsonMessageWriter::beginStruct(const ROSField& /*field*/) {}
 
-void JsonSchemaWriter::endStruct() {}
+void JsonMessageWriter::endStruct() {}
 
 }  // namespace RosMsgParser
 

@@ -298,6 +298,44 @@ TEST(Msgpack, LargeInputShouldNotCrash) {
       ::testing::ExitedWithCode(0), "");
 }
 
+TEST(Msgpack, DirectWriterMatchesTwoStep) {
+  const char* def =
+      "uint32 seq\n"
+      "float64 value\n"
+      "string name\n"
+      "uint8[3] data\n";
+
+  Parser parser("topic", ROSType("my_pkg/Test"), def);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(42)));
+  serializer.serialize(FLOAT64, Variant(3.14));
+  serializer.serializeString("hello");
+  serializer.serialize(UINT8, Variant(uint8_t(1)));
+  serializer.serialize(UINT8, Variant(uint8_t(2)));
+  serializer.serialize(UINT8, Variant(uint8_t(3)));
+
+  auto buffer = Span<const uint8_t>(
+      reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize());
+
+  // Two-step: deserialize + convertToMsgpack
+  FlatMessage flat;
+  NanoCDR_Deserializer deser1;
+  parser.deserialize(buffer, &flat, &deser1);
+  std::vector<uint8_t> msgpack_twostep;
+  convertToMsgpack(flat, msgpack_twostep);
+
+  // Direct: deserializeToMsgpack
+  NanoCDR_Deserializer deser2;
+  std::vector<uint8_t> msgpack_direct;
+  deserializeToMsgpack(parser, buffer, &deser2, msgpack_direct);
+
+  ASSERT_FALSE(msgpack_twostep.empty());
+  ASSERT_FALSE(msgpack_direct.empty());
+  EXPECT_EQ(msgpack_twostep, msgpack_direct);
+}
+
 TEST(ROSDeserializer, UnsupportedTypeShouldThrow) {
   ROS_Deserializer deserializer;
   std::vector<uint8_t> buffer(1, 0);

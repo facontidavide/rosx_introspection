@@ -2,19 +2,19 @@
 
 #include <memory>
 
-#include "rosx_introspection/schema_writer.hpp"
+#include "rosx_introspection/message_writer.hpp"
 
 #ifdef ROSX_HAS_JSON
 
 namespace RosMsgParser {
 
-class JsonSchemaWriter : public SchemaWriter {
+class JsonMessageWriter : public MessageWriter {
  public:
-  JsonSchemaWriter(void* doc, bool ignore_constants);
-  ~JsonSchemaWriter() override;
+  JsonMessageWriter(void* doc, bool ignore_constants);
+  ~JsonMessageWriter() override;
 
-  JsonSchemaWriter(const JsonSchemaWriter&) = delete;
-  JsonSchemaWriter& operator=(const JsonSchemaWriter&) = delete;
+  JsonMessageWriter(const JsonMessageWriter&) = delete;
+  JsonMessageWriter& operator=(const JsonMessageWriter&) = delete;
 
   void writeValue(const FieldLeaf& leaf, const Variant& value) override;
   void writeString(const FieldLeaf& leaf, const std::string& str) override;

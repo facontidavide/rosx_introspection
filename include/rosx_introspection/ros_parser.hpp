@@ -26,7 +26,7 @@
 
 #include "rosx_introspection/deserializer.hpp"
 #include "rosx_introspection/idl_parser.hpp"
-#include "rosx_introspection/schema_writer.hpp"
+#include "rosx_introspection/message_writer.hpp"
 #include "rosx_introspection/serializer.hpp"
 #include "rosx_introspection/stringtree_leaf.hpp"
 
@@ -148,14 +148,14 @@ class Parser {
    */
   void applyVisitorToBuffer(const ROSType& msg_type, Span<uint8_t>& buffer, VisitingCallback callback) const;
 
-  /// Walk the schema and write deserialized values to a SchemaWriter.
+  /// Walk the schema and write deserialized values to a MessageWriter.
   /// This is the unified deserialization path used by deserialize() and deserializeIntoJson().
-  bool walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, SchemaWriter* writer) const;
+  bool walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, MessageWriter* writer) const;
 
  private:
   struct WalkState {
     Deserializer* deserializer;
-    SchemaWriter* writer;
+    MessageWriter* writer;
     bool entire_message_parsed = true;
   };
 
