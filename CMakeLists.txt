@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(rosx_introspection LANGUAGES CXX VERSION 1.0.2)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+endif()
+
+project(rosx_introspection LANGUAGES CXX VERSION 3.0.0)
 
 # create compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -37,18 +41,19 @@ add_library(rosx_introspection
     src/ros_parser.cpp
     src/deserializer.cpp
     src/serializer.cpp
+    src/flat_message_writer.cpp
+    src/json_message_writer.cpp
     src/msgpack_utils.cpp
+    src/msgpack_message_writer.cpp
+    src/idl_parser.cpp
     ${EXTRA_SRC}
     )
 
 target_include_directories(rosx_introspection PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-target_compile_features(rosx_introspection PUBLIC cxx_std_17)
+target_compile_features(rosx_introspection PUBLIC cxx_std_20)
 
-# Always use the nonstd span implementation to guarantee ABI compatibility
-# when downstream consumers compile with C++20 (where std::span exists).
-target_compile_definitions(rosx_introspection PUBLIC span_CONFIG_SELECT_SPAN=1)
 
 if(USING_ROS2)
     target_link_libraries(rosx_introspection PUBLIC
@@ -112,6 +117,13 @@ if(BUILD_TESTING)
         target_link_libraries(parser_test rosx_introspection)
         target_include_directories(parser_test PUBLIC
                 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
+        ament_add_gtest(idl_parser_test
+            test/test_idl.cpp)
+
+        target_link_libraries(idl_parser_test rosx_introspection)
+        target_include_directories(idl_parser_test PUBLIC
+                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
     else()
         find_package(GTest REQUIRED)
 
@@ -123,7 +135,20 @@ if(BUILD_TESTING)
         target_include_directories(parser_test PUBLIC
                     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
         add_test(NAME parser_test COMMAND parser_test)
+
+        add_executable(idl_parser_test
+                test/test_idl.cpp)
+
+        target_link_libraries(idl_parser_test rosx_introspection GTest::GTest GTest::Main)
+        target_include_directories(idl_parser_test PUBLIC
+                    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+        add_test(NAME idl_parser_test COMMAND idl_parser_test)
     endif()
+
+    add_executable(idl_benchmark test/benchmark_idl.cpp)
+    target_link_libraries(idl_benchmark rosx_introspection)
+    target_include_directories(idl_benchmark PUBLIC
+                $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 
 endif(BUILD_TESTING)
 

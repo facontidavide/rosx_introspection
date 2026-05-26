@@ -196,12 +196,18 @@ static void cachePathsImpl(FieldTreeNode* node, const std::string& parent_path, 
     if (is_root) {
       path = field->name();
     } else {
-      path.reserve(parent_path.size() + 1 + field->name().size() + 2);
+      path.reserve(parent_path.size() + 1 + field->name().size() + 12);
       path.append(parent_path);
       path += '/';
       path += field->name();
       if (field->isArray()) {
-        path += "[]";
+        size_t num_brackets = field->arrayDimensions().size();
+        if (num_brackets < 2) {
+          num_brackets = 1;
+        }
+        for (size_t b = 0; b < num_brackets; b++) {
+          path += "[]";
+        }
       }
     }
   }

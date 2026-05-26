@@ -46,4 +46,14 @@ namespace RosMsgParser {
  */
 void convertToMsgpack(const FlatMessage& flat_msg, std::vector<uint8_t>& msgpack_data);
 
+/**
+ * @brief Deserialize directly to MessagePack, bypassing FlatMessage.
+ *
+ * Uses MsgpackMessageWriter with walkSchema to produce msgpack output in a single pass.
+ * This is faster than deserialize() + convertToMsgpack() because it avoids the
+ * intermediate FlatMessage allocation and FieldLeaf copies.
+ */
+bool deserializeToMsgpack(const Parser& parser, Span<const uint8_t> buffer,
+                          Deserializer* deserializer, std::vector<uint8_t>& msgpack_data);
+
 }  // namespace RosMsgParser

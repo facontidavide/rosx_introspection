@@ -34,6 +34,8 @@
 namespace RosMsgParser {
 
 class ROSMessage;
+struct EnumDefinition;
+struct DiscriminatedUnion;
 
 using RosMessageLibrary = std::unordered_map<ROSType, std::shared_ptr<ROSMessage>>;
 
@@ -82,6 +84,53 @@ class ROSField {
     return _array_size;
   }
 
+  void setArray(bool is_array, int size) {
+    _is_array = is_array;
+    _array_size = size;
+  }
+
+  /// For multi-dimensional arrays: stores each dimension separately.
+  /// E.g., data[3][4] → {3, 4}. Empty for 1D arrays or non-arrays.
+  const SmallVector<int, 2>& arrayDimensions() const {
+    return _array_dims;
+  }
+
+  void setArrayDimensions(const SmallVector<int, 2>& dims) {
+    _array_dims = dims;
+  }
+
+  bool isOptional() const {
+    return _is_optional;
+  }
+
+  void setOptional(bool optional) {
+    _is_optional = optional;
+  }
+
+  bool isKey() const {
+    return _is_key;
+  }
+
+  void setIsKey(bool key) {
+    _is_key = key;
+  }
+
+  const EnumDefinition* getEnum() const {
+    return _enum_ptr;
+  }
+
+  void setEnumPtr(const EnumDefinition* ptr) {
+    _enum_ptr = ptr;
+  }
+
+  const DiscriminatedUnion* getUnion() const {
+    return _union_ptr;
+  }
+
+  void setUnionPtr(const DiscriminatedUnion* ptr) {
+    _union_ptr = ptr;
+  }
+
   friend class ROSMessage;
 
   std::shared_ptr<ROSMessage> getMessagePtr(const RosMessageLibrary& library) const;
@@ -93,6 +142,12 @@ class ROSField {
   bool _is_array;
   bool _is_constant = false;
   int _array_size;
+  SmallVector<int, 2> _array_dims;  // multi-dimensional: {3, 4} for [3][4]
+  bool _is_optional = false;
+  bool _is_key = false;
+
+  const EnumDefinition* _enum_ptr = nullptr;
+  const DiscriminatedUnion* _union_ptr = nullptr;
 
   mutable const RosMessageLibrary* _cache_library = nullptr;
   mutable std::shared_ptr<ROSMessage> _cache_message;
