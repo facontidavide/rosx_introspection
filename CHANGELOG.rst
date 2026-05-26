@@ -2,6 +2,12 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.0 (2026-05-26)
+------------------
+* Add IDL schema support and message-writer based deserialization
+* Mark the breaking API update with a major version bump
+* Contributors: Davide Faconti
+
 2.3.0 (2026-04-06)
 ------------------
 * Add Ubuntu CI workflow for non-ROS builds

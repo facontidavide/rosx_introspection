@@ -4,7 +4,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
-project(rosx_introspection LANGUAGES CXX VERSION 1.0.2)
+project(rosx_introspection LANGUAGES CXX VERSION 3.0.0)
 
 # create compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
