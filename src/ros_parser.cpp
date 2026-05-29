@@ -162,8 +162,22 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
       }
     }
 
-    // Mutate leaf in-place instead of copying (Opt B)
-    leaf.node = saved_node->child(index_s);
+    // Mutate leaf in-place instead of copying (Opt B).
+    //
+    // The field tree intentionally models a DDS union as a single leaf node: it
+    // does NOT contain child nodes for the members of the union's active-case
+    // struct (see recursiveTreeCreator in idl_parser.cpp / ros_message.cpp,
+    // which does not recurse into union cases). When deserialization resolves a
+    // union case to a struct and walks it, saved_node therefore has no child for
+    // index_s. We must still walk the case struct so its bytes are consumed and
+    // the CDR cursor stays aligned, but there is no cached path to emit values
+    // against, so descend in non-storing mode and keep leaf.node valid.
+    if (index_s < saved_node->children().size()) {
+      leaf.node = saved_node->child(index_s);
+    } else {
+      leaf.node = saved_node;
+      DO_STORE = false;
+    }
 
     int32_t array_size = field.arraySize();
     if (array_size == -1) {

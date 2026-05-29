@@ -1606,3 +1606,61 @@ TEST(IDLDeserialize, EmptySequence) {
   EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 11u);
   EXPECT_EQ(flat.value[1].second.convert<uint32_t>(), 22u);
 }
+
+// Regression test for a SEGV when a DDS union's active case is a struct.
+// The field tree intentionally models a union as a single (childless) leaf
+// node, so walking the resolved case struct used to index a non-existent
+// child node -> out-of-bounds read -> crash. Reproduces the real-world
+// "2025-10-01_17-13-01_Arm_DB2.3_DDS.mcap" RoboticsCommand/SynchronizedMove
+// crash in a minimal form. The deserialization must complete without crashing.
+static const char* DESER_UNION_STRUCT_IDL = R"(
+module TestModule {
+  enum CmdType {
+    EmptyCmd,
+    MoveCmd
+  };
+  struct Target {
+    float64 value;
+  };
+  struct MoveData {
+    int32 axis;
+    Target target;
+  };
+  struct EmptyData {
+  };
+  union CmdPayload switch(CmdType) {
+    case EmptyCmd:
+      EmptyData empty;
+    case MoveCmd:
+      MoveData move;
+  };
+  struct Command {
+    uint32 id;
+    CmdPayload payload;
+  };
+};
+)";
+
+TEST(IDLDeserialize, UnionWithStructCase) {
+  Parser parser("cmd_topic", ROSType("TestModule/Command"), DESER_UNION_STRUCT_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(7)));   // Command.id
+  serializer.serialize(INT32, Variant(int32_t(1)));     // discriminator = MoveCmd (struct case)
+  serializer.serialize(INT32, Variant(int32_t(3)));     // MoveData.axis
+  serializer.serialize(FLOAT64, Variant(double(2.5)));  // MoveData.target.value (nested struct)
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  // Must not crash. (Before the fix this segfaulted in Parser::walkImpl.)
+  const bool result = parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer);
+
+  EXPECT_TRUE(result);
+  ASSERT_FALSE(flat.value.empty());
+  EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 7u);  // Command.id round-trips
+}

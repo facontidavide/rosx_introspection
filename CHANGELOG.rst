@@ -2,6 +2,15 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.0.1 (2026-05-29)
+------------------
+* Fix a crash (out-of-bounds tree access) when deserializing a DDS union whose
+  active case is a struct. The field tree models a union as a single leaf node,
+  so walking the resolved case struct indexed a non-existent child node. The
+  case struct is now walked safely to keep the CDR cursor aligned.
+* Add regression test IDLDeserialize.UnionWithStructCase
+* Contributors: Davide Faconti
+
 3.0.0 (2026-05-26)
 ------------------
 * Add IDL schema support and message-writer based deserialization
