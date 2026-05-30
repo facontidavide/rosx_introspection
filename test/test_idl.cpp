@@ -1664,3 +1664,139 @@ TEST(IDLDeserialize, UnionWithStructCase) {
   ASSERT_FALSE(flat.value.empty());
   EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 7u);  // Command.id round-trips
 }
+
+// DDS enum @value() compatibility: a @value(N) annotation sets the *display*
+// value to N while the value transmitted on the CDR wire stays the sequential
+// ordinal. ddsCompatValue() exposes the wire value used for matching.
+TEST(IDLParser, DDSEnumCompatValue) {
+  auto schema = ParseIDL("topic", ROSType("TestModule/SparseMsg"), VALUE_ANNOTATION_ENUM_IDL);
+  ASSERT_NE(schema, nullptr);
+  auto enum_it = schema->enum_library.find(ROSType("TestModule/Sparse"));
+  ASSERT_NE(enum_it, schema->enum_library.end());
+  const auto& vals = enum_it->second.values;
+  ASSERT_EQ(vals.size(), 4u);
+  // display values (unchanged behaviour)
+  EXPECT_EQ(vals[0].value, 10);
+  EXPECT_EQ(vals[2].value, 20);
+  // wire / ordinal values
+  EXPECT_EQ(vals[0].ddsCompatValue(), 0);
+  EXPECT_EQ(vals[1].ddsCompatValue(), 1);
+  EXPECT_EQ(vals[2].ddsCompatValue(), 2);
+  EXPECT_EQ(vals[3].ddsCompatValue(), 3);
+}
+
+static const char* DESER_KEY_ENUM_IDL = R"(
+module M {
+  enum Status {
+    @value(100) Idle,
+    @value(200) Active
+  };
+  struct Item {
+    @key Status status;
+    int32 data;
+  };
+};
+)";
+
+TEST(IDLDeserialize, DDSEnumKeyValueAnnotation) {
+  // A @value() enum used as a @key: the wire carries the ordinal (1 = Active),
+  // and the path suffix must resolve to the enum NAME via ddsCompatValue().
+  Parser parser("item", ROSType("M/Item"), DESER_KEY_ENUM_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(INT32, Variant(int32_t(1)));   // @key status: wire ordinal 1 -> Active
+  serializer.serialize(INT32, Variant(int32_t(42)));  // data
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);  // 'data' only; the key becomes a path suffix
+  std::string path;
+  flat.value[0].first.toStr(path);
+  EXPECT_NE(path.find("[Active]"), std::string::npos) << "path was: " << path;
+  EXPECT_EQ(flat.value[0].second.convert<int32_t>(), 42);
+}
+
+// PL_CDR optional alignment regression ("two consecutive unset optionals").
+// The 4-byte optional member header must be 4-byte aligned relative to the CDR
+// origin. A uint16 field before the optionals leaves the cursor 2-byte (not
+// 4-byte) aligned; without the alignment fix the first optional header is read
+// from a 2-byte-shifted offset, corrupting the parse of two unset optionals.
+static const char* DESER_TWO_OPTIONALS_IDL = R"(
+module M {
+  struct S {
+    uint16 a;
+    @optional uint32 opt1;
+    @optional uint32 opt2;
+    uint32 tail;
+  };
+};
+)";
+
+TEST(IDLDeserialize, TwoConsecutiveUnsetOptionals) {
+  Parser parser("s", ROSType("M/S"), DESER_TWO_OPTIONALS_IDL, DDS_IDL);
+
+  // Hand-crafted PLAIN_CDR (little-endian) buffer with 4-byte-aligned optional
+  // member headers, both marked absent (size == 0).
+  const std::vector<uint8_t> buffer = {
+      0x00, 0x01, 0x00, 0x00,  // encapsulation: PLAIN_CDR, little-endian -> DDS_CDR
+      0x34, 0x12,              // a = 0x1234            (origin + 0..1)
+      0x00, 0x00,              // padding to 4-byte align the next member header
+      0x01, 0x00, 0x00, 0x00,  // opt1 header: member_id=1, size=0 (absent)
+      0x02, 0x00, 0x00, 0x00,  // opt2 header: member_id=2, size=0 (absent)
+      0xCD, 0xAB, 0x00, 0x00,  // tail = 0xABCD
+  };
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 2u);  // 'a' and 'tail'; both optionals absent
+  EXPECT_EQ(flat.value[0].second.convert<uint32_t>(), 0x1234u);
+  EXPECT_EQ(flat.value[1].second.convert<uint32_t>(), 0xABCDu);
+}
+
+// Multiple @key fields must all contribute to the path. Previously the single
+// key suffix overwrote, keeping only the last key (causing path collisions
+// between samples that differ only in an earlier key).
+static const char* DESER_MULTI_KEY_IDL = R"(
+module M {
+  enum Joint { J1, J2 };
+  struct Cmd {
+    @key uint32 arm_id;
+    @key Joint joint;
+    float64 target;
+  };
+};
+)";
+
+TEST(IDLDeserialize, MultipleKeyFields) {
+  Parser parser("cmd", ROSType("M/Cmd"), DESER_MULTI_KEY_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(3)));  // @key arm_id = 3
+  serializer.serialize(INT32, Variant(int32_t(1)));    // @key joint  = J2 (ordinal 1)
+  serializer.serialize(FLOAT64, Variant(double(2.5))); // target
+
+  auto buffer_data = serializer.getBufferData();
+  auto buffer_size = serializer.getBufferSize();
+  std::vector<uint8_t> buffer(buffer_data, buffer_data + buffer_size);
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);  // 'target'; both keys are path suffixes
+  std::string path;
+  flat.value[0].first.toStr(path);
+  EXPECT_NE(path.find("[arm_id:3]"), std::string::npos) << "path was: " << path;
+  EXPECT_NE(path.find("[J2]"), std::string::npos) << "path was: " << path;
+  EXPECT_EQ(flat.value[0].second.convert<double>(), 2.5);
+}

@@ -417,6 +417,7 @@ class IDLAstWalker {
     EnumDefinition def;
 
     int32_t next_value = 0;
+    int32_t next_dds_compat_value = 0;
     for (const auto& child : ast->nodes) {
       auto role = roleName(child);
       if (role == "IDENTIFIER" && enum_name.empty()) {
@@ -424,6 +425,7 @@ class IDLAstWalker {
       } else if (role == "ENUMERATOR") {
         std::string name;
         std::optional<int32_t> explicit_value;
+        bool explicit_value_from_annotation = false;
 
         // After optimization, ENUMERATOR may be a leaf (ENUMERATOR[IDENTIFIER])
         if (child->is_token) {
@@ -445,6 +447,7 @@ class IDLAstWalker {
                       param.erase(param.begin());
                     }
                     explicit_value = static_cast<int32_t>(std::stoll(param, nullptr, 0));
+                    explicit_value_from_annotation = true;
                   } catch (...) {
                   }
                 }
@@ -452,17 +455,23 @@ class IDLAstWalker {
             } else {
               // Anything else is a constant expression (e.g., = value)
               explicit_value = static_cast<int32_t>(evaluateConstExpr(ec, result.constants));
+              explicit_value_from_annotation = false;
             }
           }
         }
-        if (explicit_value.has_value()) {
-          next_value = *explicit_value;
-        }
-        def.values.push_back({name, next_value});
+        // Logical value: the explicit value (annotation or `= N`) or the next
+        // sequential value. Wire value: the explicit value only when it came
+        // from an IDL `= N` (not a @value annotation); otherwise the ordinal.
+        const int32_t enum_value = explicit_value.value_or(next_value);
+        const int32_t dds_compat_value =
+            explicit_value.has_value() && !explicit_value_from_annotation ? *explicit_value
+                                                                          : next_dds_compat_value;
+        def.values.push_back({name, enum_value, dds_compat_value});
         auto full_enum_name = makeFullName(module_path, name);
-        result.constants[full_enum_name] = next_value;
-        result.constants[name] = next_value;
-        next_value++;
+        result.constants[full_enum_name] = enum_value;
+        result.constants[name] = enum_value;
+        next_value = enum_value + 1;
+        next_dds_compat_value = dds_compat_value + 1;
       }
     }
 

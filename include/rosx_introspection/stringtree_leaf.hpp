@@ -86,12 +86,16 @@ struct KeySuffix {
  * It provides the pointer to the node and a list of numbers that represent
  * the index that corresponds to the placeholder "#".
  */
+/// A field may be reached through several @key levels, so suffixes accumulate
+/// (e.g. an outer "[ArmID:3]" and an inner "[J1]"). They are appended in order.
+using KeySuffixes = SmallVector<KeySuffix, 2>;
+
 struct FieldLeaf {
   const FieldTreeNode* node = nullptr;
   SmallVector<uint16_t, 4> index_array;
-  KeySuffix key_suffix;
+  KeySuffixes key_suffixes;
 
-  /// Convert to human-readable path string (e.g., "topic/field[0]/subfield[ArmID:3]")
+  /// Convert to human-readable path string (e.g., "topic/field[0]/value[ArmID:3][J1]")
   void toStr(std::string& out) const;
 
   std::string toStdString() const {
@@ -108,7 +112,7 @@ struct FieldsVector {
   FieldsVector(const FieldLeaf& leaf);
 
   SmallVector<uint16_t, 4> index_array;
-  KeySuffix key_suffix;
+  KeySuffixes key_suffixes;
 
   void toStr(std::string& destination) const;
 

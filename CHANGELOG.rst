@@ -2,6 +2,27 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.1.0 (2026-05-30)
+------------------
+* Upstream DDS-correctness fixes that previously existed only in the
+  PlotJuggler-vendored copy of this library:
+* Bounded sequences: parse the ROS2 ``T[<=N]`` syntax as a length-prefixed
+  sequence and expose the declared bound via ``ROSField::isUpperBound()`` /
+  ``maxSize()``.
+* DDS enum ``@value()`` compatibility: a ``@value(N)`` annotation sets the
+  display value while the CDR wire value stays the sequential ordinal
+  (``EnumValue::ddsCompatValue()``); enum name resolution now matches the wire
+  ordinal.
+* PL_CDR optional alignment: 4-byte align the optional member header relative to
+  the CDR origin and bounds-check its size, fixing corruption of two or more
+  consecutive unset optional members.
+* Multiple ``@key`` fields now all contribute to the field path (the suffixes
+  accumulate instead of overwriting), preventing path collisions between samples
+  that differ only in an earlier key.
+* Tests: added BoundedSequence, DDSEnumCompatValue, DDSEnumKeyValueAnnotation,
+  TwoConsecutiveUnsetOptionals and MultipleKeyFields.
+* Contributors: Davide Faconti
+
 3.0.1 (2026-05-29)
 ------------------
 * Fix a crash (out-of-bounds tree access) when deserializing a DDS union whose

@@ -42,6 +42,31 @@ inline bool operator==(const std::string& a, const std::string_view& b) {
   return (a.size() == b.size() && std::strncmp(a.data(), b.data(), a.size()) == 0);
 }
 
+// Resolve the name of an enum value from a wire (CDR) value, matching against
+// the DDS-compat (ordinal) value so that @value-annotated enums resolve
+// correctly. Returns nullptr if there is no matching enumerator.
+static const std::string* enumNameForDDSCompatValue(const EnumDefinition* enum_def,
+                                                    int32_t enum_int) {
+  if (!enum_def) {
+    return nullptr;
+  }
+  for (const auto& ev : enum_def->values) {
+    if (ev.ddsCompatValue() == enum_int) {
+      return &ev.name;
+    }
+  }
+  return nullptr;
+}
+
+// Append a @key suffix to the leaf. A field can be reached through several @key
+// levels (e.g. ".../value[ArmID:3][J1]"), so suffixes accumulate rather than
+// overwrite. They are rolled back per scope by resizing key_suffixes.
+static void pushKeySuffix(FieldLeaf& leaf, const char* data, int len) {
+  KeySuffix ks;
+  ks.assign(data, static_cast<size_t>(len));
+  leaf.key_suffixes.push_back(ks);
+}
+
 Parser::Parser(const std::string& topic_name, const ROSType& msg_type, const std::string& definition,
                SchemaFormat format)
     : _global_warnings(&std::cerr),
@@ -112,35 +137,29 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
       std::string str;
       deserializer->deserializeString(str);
       int len = snprintf(buf, sizeof(buf), "[%s]", str.c_str());
-      leaf.key_suffix.assign(buf, len);
+      pushKeySuffix(leaf, buf, len);
     } else if (field.getEnum() != nullptr) {
       Variant var = deserializer->deserialize(INT32);
       int32_t enum_int = var.convert<int32_t>();
-      const char* enum_name = nullptr;
-      for (const auto& ev : field.getEnum()->values) {
-        if (ev.value == enum_int) {
-          enum_name = ev.name.c_str();
-          break;
-        }
-      }
+      const std::string* enum_name = enumNameForDDSCompatValue(field.getEnum(), enum_int);
       if (enum_name) {
-        int len = snprintf(buf, sizeof(buf), "[%s]", enum_name);
-        leaf.key_suffix.assign(buf, len);
+        int len = snprintf(buf, sizeof(buf), "[%s]", enum_name->c_str());
+        pushKeySuffix(leaf, buf, len);
       } else {
         int len = snprintf(buf, sizeof(buf), "[%d]", enum_int);
-        leaf.key_suffix.assign(buf, len);
+        pushKeySuffix(leaf, buf, len);
       }
     } else if (field.type().isBuiltin()) {
       Variant var = deserializer->deserialize(field.type().typeID());
       int len = snprintf(buf, sizeof(buf), "[%s:%ld]", field.name().c_str(), (long)var.convert<int64_t>());
-      leaf.key_suffix.assign(buf, len);
+      pushKeySuffix(leaf, buf, len);
     }
   }
 
   // Save leaf state for restore after each field (Opt B)
   const auto* saved_node = leaf.node;
   const auto saved_idx_size = leaf.index_array.size();
-  const auto saved_key_suffix = leaf.key_suffix;
+  const auto saved_key_suffix_size = leaf.key_suffixes.size();
 
   // --- Process non-key fields ---
   for (const ROSField& field : msg->fields()) {
@@ -243,13 +262,7 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
           Variant var = deserializer->deserialize(INT32);
           if (DO_STORE_ARRAY) {
             int32_t enum_int = var.convert<int32_t>();
-            const std::string* enum_name = nullptr;
-            for (const auto& ev : field.getEnum()->values) {
-              if (ev.value == enum_int) {
-                enum_name = &ev.name;
-                break;
-              }
-            }
+            const std::string* enum_name = enumNameForDDSCompatValue(field.getEnum(), enum_int);
             static const std::string empty_str;
             writer->writeEnum(leaf, enum_int, enum_name ? *enum_name : empty_str);
           }
@@ -333,7 +346,7 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
 
     // Restore leaf state (Opt B)
     leaf.index_array.resize(saved_idx_size);
-    leaf.key_suffix = saved_key_suffix;
+    leaf.key_suffixes.resize(saved_key_suffix_size);
     index_s++;
   }
 

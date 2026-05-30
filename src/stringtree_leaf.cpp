@@ -54,6 +54,21 @@ static size_t fillBrackets(char* buf, const char* tmpl, size_t tmpl_size,
   return out_off;
 }
 
+static size_t totalKeyBytes(const KeySuffixes& key_suffixes) {
+  size_t n = 0;
+  for (const auto& ks : key_suffixes) {
+    n += ks.len;
+  }
+  return n;
+}
+
+static void appendKeySuffixes(char* out, size_t& offset, const KeySuffixes& key_suffixes) {
+  for (const auto& ks : key_suffixes) {
+    std::memcpy(out + offset, ks.data, ks.len);
+    offset += ks.len;
+  }
+}
+
 // FieldLeaf::toStr — uses precomputed path template + bracket offset table.
 void FieldLeaf::toStr(std::string& out) const {
   if (!node) {
@@ -62,30 +77,27 @@ void FieldLeaf::toStr(std::string& out) const {
   }
   const auto& tmpl = node->cachedPath();
   const uint8_t num_brackets = node->bracketCount();
+  const size_t key_bytes = totalKeyBytes(key_suffixes);
 
-  if (num_brackets == 0 && key_suffix.empty()) {
+  if (num_brackets == 0 && key_bytes == 0) {
     out = tmpl;
     return;
   }
 
-  size_t extra = num_brackets * 5 + key_suffix.len;
+  size_t extra = num_brackets * 5 + key_bytes;
   out.resize(tmpl.size() + extra);
 
   size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
                                node->bracketOffsets(), num_brackets, index_array);
 
-  if (!key_suffix.empty()) {
-    std::memcpy(out.data() + offset, key_suffix.data, key_suffix.len);
-    offset += key_suffix.len;
-  }
-
+  appendKeySuffixes(out.data(), offset, key_suffixes);
   out.resize(offset);
 }
 
 // FieldsVector — kept for backward compatibility
 FieldsVector::FieldsVector(const FieldLeaf& leaf) : _node(leaf.node) {
   index_array = leaf.index_array;
-  key_suffix = leaf.key_suffix;
+  key_suffixes = leaf.key_suffixes;
 }
 
 void FieldsVector::toStr(std::string& out) const {
@@ -96,23 +108,20 @@ void FieldsVector::toStr(std::string& out) const {
 
   const auto& tmpl = _node->cachedPath();
   const uint8_t num_brackets = _node->bracketCount();
+  const size_t key_bytes = totalKeyBytes(key_suffixes);
 
-  if (num_brackets == 0 && key_suffix.empty()) {
+  if (num_brackets == 0 && key_bytes == 0) {
     out = tmpl;
     return;
   }
 
-  size_t extra = num_brackets * 5 + key_suffix.len;
+  size_t extra = num_brackets * 5 + key_bytes;
   out.resize(tmpl.size() + extra);
 
   size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
                                _node->bracketOffsets(), num_brackets, index_array);
 
-  if (!key_suffix.empty()) {
-    std::memcpy(out.data() + offset, key_suffix.data, key_suffix.len);
-    offset += key_suffix.len;
-  }
-
+  appendKeySuffixes(out.data(), offset, key_suffixes);
   out.resize(offset);
 }
 

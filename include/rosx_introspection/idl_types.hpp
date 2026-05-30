@@ -12,6 +12,16 @@ namespace RosMsgParser {
 struct EnumValue {
   std::string name;
   int32_t value = 0;
+
+  /// Wire (CDR) value, which can differ from the logical `value` for DDS enums:
+  /// a `@value(N)` annotation sets the display value to N while the value
+  /// transmitted on the wire stays the sequential ordinal. An explicit IDL
+  /// `= N` sets both. Defaults to `value` when unset.
+  std::optional<int32_t> dds_compat_value;
+
+  int32_t ddsCompatValue() const {
+    return dds_compat_value.value_or(value);
+  }
 };
 
 struct EnumDefinition {

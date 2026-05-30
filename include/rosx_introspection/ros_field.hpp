@@ -89,6 +89,18 @@ class ROSField {
     _array_size = size;
   }
 
+  /// True if the field is a bounded sequence (e.g. `int32[<=5]`).
+  /// Bounded sequences carry a CDR length prefix on the wire just like
+  /// unbounded ones, so arraySize() returns -1 in that case.
+  bool isUpperBound() const {
+    return _is_bounded;
+  }
+
+  /// Declared upper bound for a bounded sequence, or -1 if not bounded.
+  int maxSize() const {
+    return _max_size;
+  }
+
   /// For multi-dimensional arrays: stores each dimension separately.
   /// E.g., data[3][4] → {3, 4}. Empty for 1D arrays or non-arrays.
   const SmallVector<int, 2>& arrayDimensions() const {
@@ -141,7 +153,9 @@ class ROSField {
   std::string _value;
   bool _is_array;
   bool _is_constant = false;
+  bool _is_bounded = false;
   int _array_size;
+  int _max_size = -1;
   SmallVector<int, 2> _array_dims;  // multi-dimensional: {3, 4} for [3][4]
   bool _is_optional = false;
   bool _is_key = false;

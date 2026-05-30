@@ -178,3 +178,30 @@ TEST(Parser, QuaternionFieldROS2) {
   ASSERT_EQ(field.type().typeID(), FLOAT64);
   ASSERT_EQ(field.name(), "x");
 }
+
+TEST(Parser, BoundedSequence) {
+  // ROS2 bounded sequence syntax `T[<=N]` must parse as a length-prefixed
+  // sequence (arraySize() == -1, like an unbounded sequence) while remembering
+  // the declared upper bound. Previously `[<=N]` failed to parse.
+  ROSMessage msg("int32[<=5] bounded\nint32[] unbounded\nint32[3] fixed\nint32 scalar\n");
+  ASSERT_EQ(msg.fields().size(), 4u);
+
+  const auto& bounded = msg.field(0);
+  EXPECT_EQ(bounded.name(), "bounded");
+  EXPECT_TRUE(bounded.isArray());
+  EXPECT_EQ(bounded.arraySize(), -1);
+  EXPECT_TRUE(bounded.isUpperBound());
+  EXPECT_EQ(bounded.maxSize(), 5);
+
+  const auto& unbounded = msg.field(1);
+  EXPECT_TRUE(unbounded.isArray());
+  EXPECT_EQ(unbounded.arraySize(), -1);
+  EXPECT_FALSE(unbounded.isUpperBound());
+
+  const auto& fixed = msg.field(2);
+  EXPECT_TRUE(fixed.isArray());
+  EXPECT_EQ(fixed.arraySize(), 3);
+  EXPECT_FALSE(fixed.isUpperBound());
+
+  EXPECT_FALSE(msg.field(3).isArray());
+}
