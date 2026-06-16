@@ -112,7 +112,8 @@ if(BUILD_TESTING)
 
         ament_add_gtest(parser_test
             test/test_parser.cpp
-            test/test_encoding.cpp)
+            test/test_encoding.cpp
+            test/test_msgpack.cpp)
 
         target_link_libraries(parser_test rosx_introspection)
         target_include_directories(parser_test PUBLIC
@@ -129,7 +130,8 @@ if(BUILD_TESTING)
 
         add_executable(parser_test
                 test/test_parser.cpp
-                test/test_encoding.cpp)
+                test/test_encoding.cpp
+                test/test_msgpack.cpp)
 
         target_link_libraries(parser_test rosx_introspection GTest::GTest GTest::Main)
         target_include_directories(parser_test PUBLIC
