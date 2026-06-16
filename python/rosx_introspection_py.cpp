@@ -36,9 +36,12 @@ class Parser {
     // Create span from input data
     RosMsgParser::Span<const uint8_t> msg_span(reinterpret_cast<const uint8_t*>(raw_data.c_str()), raw_data.size());
 
-    if (!parser_.deserialize(msg_span, &flat_msg_, &deserializer_)) {
-      throw std::runtime_error("Failed to parse ROS message");
-    }
+    // deserialize() returns false when oversized arrays were discarded by the
+    // DISCARD_LARGE_ARRAYS policy (e.g. a tf message with >max_array_size
+    // transforms). That is expected behaviour, not an error: the FlatMessage is
+    // still valid (minus the discarded arrays). Genuine failures throw, and the
+    // exception propagates out of this method to Python.
+    parser_.deserialize(msg_span, &flat_msg_, &deserializer_);
 
     RosMsgParser::convertToMsgpack(flat_msg_, output_buffer_);
     return nb::bytes(reinterpret_cast<const char*>(output_buffer_.data()), output_buffer_.size());

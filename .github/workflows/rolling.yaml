@@ -10,6 +10,7 @@ jobs:
       - uses: 'ros-industrial/industrial_ci@master'
         env:
           ROS_DISTRO: rolling
+          OS_CODE_NAME: noble
           ROS_REPO: main
         with:
             package-name: rosx_introspection

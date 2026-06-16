@@ -74,7 +74,15 @@ void convertToMsgpack(const FlatMessage& flat_msg, std::vector<uint8_t>& msgpack
   std::string key_buf;
   for (const auto& [key, num_value] : flat_msg.value) {
     key.toStr(key_buf);
-    resize_if_needed(5 + key_buf.size() + 9);  // max key header + key + max value size
+    // A number packs into at most 9 bytes, but a STRING value can be arbitrarily
+    // large. If we only reserved 9 bytes, pack_string() would write past the
+    // buffer and the trailing resize(offset) would reallocate and zero-fill the
+    // overflowed tail, truncating long strings (~64KB) to NULs.
+    size_t value_capacity = 9;
+    if (num_value.getTypeID() == BuiltinType::STRING) {
+      value_capacity = 5 + num_value.convert<std::string>().size();  // str32 header + bytes
+    }
+    resize_if_needed(5 + key_buf.size() + value_capacity);  // key header + key + value
     offset += msgpack::pack_string(msgpack_data.data() + offset, key_buf);
     offset += pack_variant(num_value, msgpack_data.data() + offset);
   }
