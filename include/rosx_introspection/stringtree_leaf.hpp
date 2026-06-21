@@ -59,8 +59,9 @@ inline int print_number(char* buffer, uint16_t value) {
 
 namespace RosMsgParser {
 
-/// Fixed-size buffer for @key suffixes (e.g., "[ArmID:3]").
-/// Avoids heap allocation — typical key suffixes are < 48 chars.
+/// Fixed-size buffer for a @key bracket value (e.g., "ArmID:3").
+/// Stores only the bracket *content*; the surrounding "[" "]" are added by the
+/// path renderer. Avoids heap allocation — typical key values are < 48 chars.
 struct KeySuffix {
   char data[48] = {};
   uint8_t len = 0;
@@ -86,8 +87,9 @@ struct KeySuffix {
  * It provides the pointer to the node and a list of numbers that represent
  * the index that corresponds to the placeholder "#".
  */
-/// A field may be reached through several @key levels, so suffixes accumulate
-/// (e.g. an outer "[ArmID:3]" and an inner "[J1]"). They are appended in order.
+/// A field may be reached through several @key levels (e.g. an outer "ArmID:3"
+/// and an inner "J1"). Each value fills one key bracket placeholder in the
+/// node's cached path, in order.
 using KeySuffixes = SmallVector<KeySuffix, 2>;
 
 struct FieldLeaf {

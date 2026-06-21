@@ -100,7 +100,7 @@ std::vector<ROSMessage::Ptr> ParseMessageDefinitions(const std::string& multi_de
 
 MessageSchema::Ptr BuildMessageSchema(const std::string& topic_name, const std::vector<ROSMessage::Ptr>& parsed_msgs);
 
-void CacheFieldTreePaths(FieldTree& tree);
+void CacheFieldTreePaths(FieldTree& tree, const RosMessageLibrary& library);
 
 }  // namespace RosMsgParser
 

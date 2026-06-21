@@ -930,10 +930,10 @@ TEST(IDLDeserialize, KeyPathSuffix) {
 
 // Test real-world IDL parsing (integration test)
 static const char* REAL_WORLD_IDL = R"(
-#ifndef ASENSUS_DATA_TYPES
-#define ASENSUS_DATA_TYPES
+#ifndef COMMON_DATA_TYPES
+#define COMMON_DATA_TYPES
 
-module AsensusMessaging {
+module CommonTypes {
 
   typedef uint64 ArmIDType;
   typedef string<36> UserID;
@@ -1024,7 +1024,7 @@ module AsensusMessaging {
 )";
 
 // ============================================================
-// Cross-parser comparison: rosx_introspection vs dds-parser
+// Comparison against a reference DDS decode of a real recorded message
 // ============================================================
 
 static std::string readFile(const std::string& path) {
@@ -1045,7 +1045,7 @@ static std::vector<uint8_t> readBinaryFile(const std::string& path) {
   return std::vector<uint8_t>(std::istreambuf_iterator<char>(f), {});
 }
 
-// Convert a Variant to a type:value string matching dds-parser's format
+// Convert a Variant to a "type:value" string matching the reference output format
 static std::string variantToTypeValue(const Variant& v) {
   std::ostringstream oss;
   switch (v.getTypeID()) {
@@ -1152,13 +1152,13 @@ TEST(IDLComparison, McapRoboticsInputs) {
     }
   }
 
-  // NOTE: Known differences between rosx_introspection and dds-parser output:
-  // 1. Key handling: dds-parser uses enum key names as array indices (e.g., [IDS1]),
-  //    rosx_introspection uses numeric indices with key suffix (e.g., [0]...[J1])
-  // 2. Enum fields: dds-parser emits both /enum_str (string) and /enum_val (int),
-  //    rosx_introspection emits only the int value
-  // These are known divergences that will be addressed incrementally.
-  // For now, just verify we deserialized a reasonable number of values.
+  // NOTE: @key paths now match the reference output exactly (the key value
+  // fills the bracket in position, and for a sequence of keyed structs it
+  // replaces the numeric index). One representation difference remains: for an
+  // enum field the reference emits both an "/enum_str" (string) and an
+  // "/enum_val" (int) entry, whereas this parser emits only the int value at
+  // the field path. That makes this parser produce fewer entries, so we check
+  // the count is in a sane range rather than comparing line-by-line.
   EXPECT_GT(actual_lines.size(), 200u)
       << "Expected at least 200 values from RoboticsInputs message";
   EXPECT_LE(actual_lines.size(), expected_lines.size())
@@ -1166,26 +1166,26 @@ TEST(IDLComparison, McapRoboticsInputs) {
 }
 
 TEST(IDLParser, RealWorldDataTypes) {
-  auto schema = ParseIDL("topic", ROSType("AsensusMessaging/ArmState"), REAL_WORLD_IDL);
+  auto schema = ParseIDL("topic", ROSType("CommonTypes/ArmState"), REAL_WORLD_IDL);
 
   ASSERT_NE(schema, nullptr);
 
   // Check structs
-  EXPECT_NE(schema->msg_library.find(ROSType("AsensusMessaging/Pose")), schema->msg_library.end());
-  EXPECT_NE(schema->msg_library.find(ROSType("AsensusMessaging/Wrench")), schema->msg_library.end());
-  EXPECT_NE(schema->msg_library.find(ROSType("AsensusMessaging/Vector3D")), schema->msg_library.end());
-  EXPECT_NE(schema->msg_library.find(ROSType("AsensusMessaging/ArmPosition")), schema->msg_library.end());
-  EXPECT_NE(schema->msg_library.find(ROSType("AsensusMessaging/TransformationFrame")), schema->msg_library.end());
+  EXPECT_NE(schema->msg_library.find(ROSType("CommonTypes/Pose")), schema->msg_library.end());
+  EXPECT_NE(schema->msg_library.find(ROSType("CommonTypes/Wrench")), schema->msg_library.end());
+  EXPECT_NE(schema->msg_library.find(ROSType("CommonTypes/Vector3D")), schema->msg_library.end());
+  EXPECT_NE(schema->msg_library.find(ROSType("CommonTypes/ArmPosition")), schema->msg_library.end());
+  EXPECT_NE(schema->msg_library.find(ROSType("CommonTypes/TransformationFrame")), schema->msg_library.end());
 
   // Check enums
   EXPECT_EQ(schema->enum_library.size(), 2u);  // FrameID and ErrorEnum
-  auto frame_it = schema->enum_library.find(ROSType("AsensusMessaging/FrameID"));
+  auto frame_it = schema->enum_library.find(ROSType("CommonTypes/FrameID"));
   ASSERT_NE(frame_it, schema->enum_library.end());
   EXPECT_EQ(frame_it->second.values.size(), 10u);
   EXPECT_EQ(frame_it->second.values[0].name, "BaseLink");
   EXPECT_EQ(frame_it->second.values[0].value, 0);
 
-  auto error_it = schema->enum_library.find(ROSType("AsensusMessaging/ErrorEnum"));
+  auto error_it = schema->enum_library.find(ROSType("CommonTypes/ErrorEnum"));
   ASSERT_NE(error_it, schema->enum_library.end());
   EXPECT_EQ(error_it->second.values[1].name, "ArmBegin");
   EXPECT_EQ(error_it->second.values[1].value, 0x1000);
@@ -1799,4 +1799,258 @@ TEST(IDLDeserialize, MultipleKeyFields) {
   EXPECT_NE(path.find("[arm_id:3]"), std::string::npos) << "path was: " << path;
   EXPECT_NE(path.find("[J2]"), std::string::npos) << "path was: " << path;
   EXPECT_EQ(flat.value[0].second.convert<double>(), 2.5);
+}
+
+// ============================================================
+// @key path handling for OMG IDL / DDS keyed types.
+//
+// A @key member is consumed first and rendered as a "[...]" bracket placed
+// immediately after the node of the struct that owns it (NOT appended at the
+// end of the path). For a sequence of keyed structs the key takes the place
+// of the numeric array index, so elements are identified by key rather than
+// by position. These tests assert full, exact paths (not substring matches).
+//
+//   - integral key -> "[fieldName:value]"
+//   - enum key     -> "[EnumName]"
+//   - string key   -> "[value]"
+// ============================================================
+
+static std::vector<std::string> AllPaths(const FlatMessage& flat) {
+  std::vector<std::string> out;
+  out.reserve(flat.value.size());
+  for (const auto& [leaf, value] : flat.value) {
+    out.push_back(leaf.toStdString());
+  }
+  return out;
+}
+
+// --- A top-level integral @key renders right after the topic node ---------
+static const char* KEY_TOPLEVEL_IDL = R"(
+module M {
+  struct KeyedMsg {
+    @key uint32 instance_id;
+    float64 value;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, TopLevelIntegralKeyPosition) {
+  Parser parser("topic", ROSType("M/KeyedMsg"), KEY_TOPLEVEL_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(7)));  // @key instance_id = 7
+  serializer.serialize(FLOAT64, Variant(42.0));         // value
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);
+  EXPECT_EQ(flat.value[0].first.toStdString(), "topic[instance_id:7]/value");
+  EXPECT_DOUBLE_EQ(flat.value[0].second.convert<double>(), 42.0);
+}
+
+// --- Multiple top-level @key fields, both right after the topic node -------
+static const char* KEY_MULTI_IDL = R"(
+module M {
+  enum Joint { J1, J2 };
+  struct Cmd {
+    @key uint32 arm_id;
+    @key Joint joint;
+    float64 target;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, MultipleTopLevelKeysPosition) {
+  Parser parser("cmd", ROSType("M/Cmd"), KEY_MULTI_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(3)));   // @key arm_id = 3
+  serializer.serialize(INT32, Variant(int32_t(1)));     // @key joint  = J2 (ordinal 1)
+  serializer.serialize(FLOAT64, Variant(double(2.5)));  // target
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);
+  EXPECT_EQ(flat.value[0].first.toStdString(), "cmd[arm_id:3][J2]/target");
+  EXPECT_DOUBLE_EQ(flat.value[0].second.convert<double>(), 2.5);
+}
+
+// --- An enum @key renders as its NAME, in position ------------------------
+static const char* KEY_ENUM_IDL = R"(
+module M {
+  enum Status {
+    @value(100) Idle,
+    @value(200) Active
+  };
+  struct Item {
+    @key Status status;
+    int32 data;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, EnumKeyPosition) {
+  Parser parser("item", ROSType("M/Item"), KEY_ENUM_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(INT32, Variant(int32_t(1)));   // @key status: wire ordinal 1 -> Active
+  serializer.serialize(INT32, Variant(int32_t(42)));  // data
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);
+  EXPECT_EQ(flat.value[0].first.toStdString(), "item[Active]/data");
+  EXPECT_EQ(flat.value[0].second.convert<int32_t>(), 42);
+}
+
+// --- A string @key renders as "[value]" in position -----------------------
+static const char* KEY_STRING_IDL = R"(
+module M {
+  struct Named {
+    @key string<32> name;
+    int32 v;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, StringKeyPosition) {
+  Parser parser("k", ROSType("M/Named"), KEY_STRING_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeString("foo");                 // @key name = "foo"
+  serializer.serialize(INT32, Variant(int32_t(5)));  // v
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);
+  EXPECT_EQ(flat.value[0].first.toStdString(), "k[foo]/v");
+  EXPECT_EQ(flat.value[0].second.convert<int32_t>(), 5);
+}
+
+// --- A @key on a nested (non-array) struct field renders after that field --
+static const char* KEY_NESTED_PLAIN_IDL = R"(
+module M {
+  struct Inner {
+    @key uint32 id;
+    float64 v;
+  };
+  struct Outer {
+    Inner inner;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, KeyOnNestedPlainStruct) {
+  Parser parser("o", ROSType("M/Outer"), KEY_NESTED_PLAIN_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serialize(UINT32, Variant(uint32_t(9)));  // inner.@key id = 9
+  serializer.serialize(FLOAT64, Variant(1.5));          // inner.v
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 1u);
+  EXPECT_EQ(flat.value[0].first.toStdString(), "o/inner[id:9]/v");
+  EXPECT_DOUBLE_EQ(flat.value[0].second.convert<double>(), 1.5);
+}
+
+// --- THE CORE CASE: a sequence of keyed structs uses the key in place of the
+//     numeric array index (e.g. /moves[J1]/..., /moves[J2]/...) -------------
+static const char* KEY_SEQUENCE_IDL = R"(
+module M {
+  enum Joint { J1, J2, J3 };
+  struct MoveTarget {
+    float64 value;
+  };
+  struct AxisMove {
+    @key Joint joint;
+    MoveTarget target;
+  };
+  struct SyncMove {
+    sequence<AxisMove, 30> moves;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, KeyedSequenceUsesKeyNotIndex) {
+  Parser parser("sync", ROSType("M/SyncMove"), KEY_SEQUENCE_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(2);                     // sequence length = 2
+  serializer.serialize(INT32, Variant(int32_t(0)));  // moves[0].@key joint = J1
+  serializer.serialize(FLOAT64, Variant(1.0));        // moves[0].target.value
+  serializer.serialize(INT32, Variant(int32_t(1)));  // moves[1].@key joint = J2
+  serializer.serialize(FLOAT64, Variant(2.0));        // moves[1].target.value
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 2u);
+  auto paths = AllPaths(flat);
+  EXPECT_EQ(paths[0], "sync/moves[J1]/target/value");
+  EXPECT_EQ(paths[1], "sync/moves[J2]/target/value");
+  EXPECT_DOUBLE_EQ(flat.value[0].second.convert<double>(), 1.0);
+  EXPECT_DOUBLE_EQ(flat.value[1].second.convert<double>(), 2.0);
+}
+
+// --- Regression guard: a sequence of NON-keyed structs still uses [i] ------
+static const char* NONKEY_SEQUENCE_IDL = R"(
+module M {
+  struct Inner {
+    float64 a;
+  };
+  struct Plain {
+    sequence<Inner, 10> items;
+  };
+};
+)";
+
+TEST(IDLKeyConvergence, NonKeyedSequenceUsesIndex) {
+  Parser parser("p", ROSType("M/Plain"), NONKEY_SEQUENCE_IDL, DDS_IDL);
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(2);                // sequence length = 2
+  serializer.serialize(FLOAT64, Variant(1.0));  // items[0].a
+  serializer.serialize(FLOAT64, Variant(2.0));  // items[1].a
+
+  std::vector<uint8_t> buffer(serializer.getBufferData(),
+                              serializer.getBufferData() + serializer.getBufferSize());
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  ASSERT_TRUE(parser.deserialize(Span<const uint8_t>(buffer), &flat, &deserializer));
+
+  ASSERT_EQ(flat.value.size(), 2u);
+  auto paths = AllPaths(flat);
+  EXPECT_EQ(paths[0], "p/items[0]/a");
+  EXPECT_EQ(paths[1], "p/items[1]/a");
 }

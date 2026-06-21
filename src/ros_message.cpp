@@ -184,41 +184,85 @@ MessageSchema::Ptr BuildMessageSchema(const std::string& topic_name, const std::
 
   recursiveTreeCreator(schema->root_msg, schema->field_tree.root());
 
-  CacheFieldTreePaths(schema->field_tree);
+  CacheFieldTreePaths(schema->field_tree, schema->msg_library);
 
   return schema;
 }
 
-static void cachePathsImpl(FieldTreeNode* node, const std::string& parent_path, bool is_root) {
+// Number of @key members declared by the struct that is the type of `field`.
+// Returns 0 for builtins, enums, or any type not resolvable to a struct.
+static int structKeyCount(const ROSField* field, const RosMessageLibrary& library) {
+  if (!field || field->type().isBuiltin()) {
+    return 0;
+  }
+  auto msg = field->getMessagePtr(library);
+  if (!msg) {
+    return 0;
+  }
+  int count = 0;
+  for (const auto& f : msg->fields()) {
+    if (!f.isConstant() && f.isKey()) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Build each node's cached path with "[]" bracket placeholders, and a parallel
+// bitmask marking which placeholders carry a @key value (vs a numeric array
+// index). A @key contributes one bracket right after the node of the struct
+// that owns it; for a sequence of keyed structs the key replaces the array
+// index, so the numeric index is suppressed.
+static void cachePathsImpl(FieldTreeNode* node, const std::string& parent_path, uint8_t parent_mask,
+                           uint8_t parent_brackets, bool is_root, const RosMessageLibrary& library) {
   const ROSField* field = node->value();
   std::string path;
+  uint8_t mask = parent_mask;
+  uint8_t bracket_count = parent_brackets;
+
+  auto addBrackets = [&](int n, bool is_key) {
+    for (int i = 0; i < n; i++) {
+      path += "[]";
+      if (is_key && bracket_count < 8) {
+        mask |= static_cast<uint8_t>(1u << bracket_count);
+      }
+      bracket_count++;
+    }
+  };
+
   if (field) {
+    const int num_keys = structKeyCount(field, library);
     if (is_root) {
       path = field->name();
+      addBrackets(num_keys, /*is_key=*/true);
     } else {
       path.reserve(parent_path.size() + 1 + field->name().size() + 12);
       path.append(parent_path);
       path += '/';
       path += field->name();
       if (field->isArray()) {
-        size_t num_brackets = field->arrayDimensions().size();
-        if (num_brackets < 2) {
-          num_brackets = 1;
+        if (num_keys > 0) {
+          // Sequence of keyed structs: the key takes the place of the index.
+          addBrackets(num_keys, /*is_key=*/true);
+        } else {
+          size_t dims = field->arrayDimensions().size();
+          addBrackets(dims < 2 ? 1 : static_cast<int>(dims), /*is_key=*/false);
         }
-        for (size_t b = 0; b < num_brackets; b++) {
-          path += "[]";
-        }
+      } else if (num_keys > 0) {
+        // Keyed struct reached as a plain (non-array) field.
+        addBrackets(num_keys, /*is_key=*/true);
       }
     }
   }
   node->setCachedPath(path);
+  node->setBracketKeyMask(mask);
   for (auto& child : node->children()) {
-    cachePathsImpl(&child, path, false);
+    cachePathsImpl(&child, path, mask, bracket_count, false, library);
   }
 }
 
-void CacheFieldTreePaths(FieldTree& tree) {
-  cachePathsImpl(tree.root(), "", true);
+void CacheFieldTreePaths(FieldTree& tree, const RosMessageLibrary& library) {
+  cachePathsImpl(tree.root(), "", 0, 0, true, library);
 }
 
 }  // namespace RosMsgParser

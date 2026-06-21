@@ -888,7 +888,7 @@ MessageSchema::Ptr ParseIDL(const std::string& topic_name, const ROSType& root_t
 
   recursiveTreeCreator(*schema->root_msg, schema->field_tree.root());
 
-  CacheFieldTreePaths(schema->field_tree);
+  CacheFieldTreePaths(schema->field_tree, schema->msg_library);
 
   return schema;
 }

@@ -1,4 +1,4 @@
-module AsensusMessaging {
+module CommonTypes {
     typedef unsigned long long ArmIDType;
 };
 
@@ -110,7 +110,7 @@ module ims_msgs {
     };
 };
 
-module AsensusMessaging {
+module CommonTypes {
     struct Wrench {
         double Fx;
         double Fy;
@@ -121,7 +121,7 @@ module AsensusMessaging {
     };
 };
 
-module AsensusMessaging {
+module CommonTypes {
     struct Vector3D {
         float X;
         float Y;
@@ -131,9 +131,9 @@ module AsensusMessaging {
 
 module ims_msgs {
     struct SixDofForceSensorInputs {
-        AsensusMessaging::Wrench Forces;
-        AsensusMessaging::Vector3D LinearAcceleration;
-        AsensusMessaging::Vector3D AngularVelocity;
+        CommonTypes::Wrench Forces;
+        CommonTypes::Vector3D LinearAcceleration;
+        CommonTypes::Vector3D AngularVelocity;
         unsigned long StatusCode;
         unsigned long SampleCounter;
         ims_msgs::DeviceIOErrorCode ErrorCode;
@@ -143,7 +143,7 @@ module ims_msgs {
 
 module ims_msgs {
     struct RoboticsInputs {
-        @key AsensusMessaging::ArmIDType ArmID;
+        @key CommonTypes::ArmIDType ArmID;
         sequence<ims_msgs::MotorFeedback,100> MotorData;
         sequence<ims_msgs::JointFeedback,100> JointData;
         ims_msgs::SixDofForceSensorInputs SixDofData;

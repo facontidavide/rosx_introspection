@@ -26,11 +26,16 @@
 namespace RosMsgParser {
 
 // Helper: fill bracket placeholders in a cached path template using segment memcpy.
+// Each placeholder is filled with either a @key value (key_mask bit set, pulled
+// in order from key_suffixes) or a numeric array index (pulled in order from
+// index_array). The two sources advance on independent cursors.
 static size_t fillBrackets(char* buf, const char* tmpl, size_t tmpl_size,
-                           const uint16_t* offsets, uint8_t num_brackets,
-                           const SmallVector<uint16_t, 4>& index_array) {
+                           const uint16_t* offsets, uint8_t num_brackets, uint8_t key_mask,
+                           const SmallVector<uint16_t, 4>& index_array, const KeySuffixes& key_suffixes) {
   size_t out_off = 0;
   size_t src_off = 0;
+  size_t idx_cursor = 0;
+  size_t key_cursor = 0;
 
   for (uint8_t i = 0; i < num_brackets; i++) {
     size_t seg_len = offsets[i] - src_off;
@@ -38,8 +43,14 @@ static size_t fillBrackets(char* buf, const char* tmpl, size_t tmpl_size,
     out_off += seg_len;
 
     buf[out_off++] = '[';
-    if (i < index_array.size()) {
-      out_off += print_number(buf + out_off, index_array[i]);
+    if (key_mask & (1u << i)) {
+      if (key_cursor < key_suffixes.size()) {
+        const auto& ks = key_suffixes[key_cursor++];
+        std::memcpy(buf + out_off, ks.data, ks.len);
+        out_off += ks.len;
+      }
+    } else if (idx_cursor < index_array.size()) {
+      out_off += print_number(buf + out_off, index_array[idx_cursor++]);
     }
     buf[out_off++] = ']';
     src_off = offsets[i] + 2;
@@ -62,13 +73,6 @@ static size_t totalKeyBytes(const KeySuffixes& key_suffixes) {
   return n;
 }
 
-static void appendKeySuffixes(char* out, size_t& offset, const KeySuffixes& key_suffixes) {
-  for (const auto& ks : key_suffixes) {
-    std::memcpy(out + offset, ks.data, ks.len);
-    offset += ks.len;
-  }
-}
-
 // FieldLeaf::toStr — uses precomputed path template + bracket offset table.
 void FieldLeaf::toStr(std::string& out) const {
   if (!node) {
@@ -77,20 +81,19 @@ void FieldLeaf::toStr(std::string& out) const {
   }
   const auto& tmpl = node->cachedPath();
   const uint8_t num_brackets = node->bracketCount();
-  const size_t key_bytes = totalKeyBytes(key_suffixes);
 
-  if (num_brackets == 0 && key_bytes == 0) {
+  if (num_brackets == 0) {
     out = tmpl;
     return;
   }
 
-  size_t extra = num_brackets * 5 + key_bytes;
+  // Upper bound: each bracket adds "[]" plus its content (<= 5 digits for an
+  // index, or the key value bytes).
+  size_t extra = num_brackets * 7 + totalKeyBytes(key_suffixes);
   out.resize(tmpl.size() + extra);
 
-  size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
-                               node->bracketOffsets(), num_brackets, index_array);
-
-  appendKeySuffixes(out.data(), offset, key_suffixes);
+  size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(), node->bracketOffsets(), num_brackets,
+                               node->bracketKeyMask(), index_array, key_suffixes);
   out.resize(offset);
 }
 
@@ -108,20 +111,17 @@ void FieldsVector::toStr(std::string& out) const {
 
   const auto& tmpl = _node->cachedPath();
   const uint8_t num_brackets = _node->bracketCount();
-  const size_t key_bytes = totalKeyBytes(key_suffixes);
 
-  if (num_brackets == 0 && key_bytes == 0) {
+  if (num_brackets == 0) {
     out = tmpl;
     return;
   }
 
-  size_t extra = num_brackets * 5 + key_bytes;
+  size_t extra = num_brackets * 7 + totalKeyBytes(key_suffixes);
   out.resize(tmpl.size() + extra);
 
-  size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(),
-                               _node->bracketOffsets(), num_brackets, index_array);
-
-  appendKeySuffixes(out.data(), offset, key_suffixes);
+  size_t offset = fillBrackets(out.data(), tmpl.data(), tmpl.size(), _node->bracketOffsets(), num_brackets,
+                               _node->bracketKeyMask(), index_array, key_suffixes);
   out.resize(offset);
 }
 
