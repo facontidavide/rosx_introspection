@@ -4,6 +4,7 @@
 [![Humble](https://github.com/facontidavide/rosx_introspection/actions/workflows/humble.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/humble.yaml)
 [![Jazzy](https://github.com/facontidavide/rosx_introspection/actions/workflows/jazzy.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/jazzy.yaml)
 [![Kilted](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/kilted.yaml)
+[![Lyrical](https://github.com/facontidavide/rosx_introspection/actions/workflows/lyrical.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/lyrical.yaml)
 [![Rolling](https://github.com/facontidavide/rosx_introspection/actions/workflows/rolling.yaml/badge.svg)](https://github.com/facontidavide/rosx_introspection/actions/workflows/rolling.yaml)
 
 A runtime message parser and introspection library for ROS. It can deserialize any ROS message
