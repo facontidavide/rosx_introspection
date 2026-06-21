@@ -2,6 +2,21 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.1.1 (2026-06-21)
+------------------
+* DDS ``@key`` members now contribute to the field path *in position*: the key
+  value is rendered as a bracket immediately after the struct that owns it
+  (e.g. ``topic[ArmID:0]/State``) instead of being appended at the end of the
+  path. For a sequence of keyed structs the key replaces the numeric array
+  index (e.g. ``Moves[J1]/...``, ``Moves[J2]/...``), so elements are identified
+  by key rather than by unstable position.
+* Fix key brackets accumulating across sequence elements (e.g.
+  ``Moves[1]/...[J1][J2]``) by rolling them back per element.
+* Key bracket formats: integral ``[field:value]``, enum ``[EnumName]``,
+  string ``[value]``.
+* Tests: added the IDLKeyConvergence suite asserting exact key paths.
+* Contributors: Davide Faconti
+
 3.1.0 (2026-05-30)
 ------------------
 * Upstream DDS-correctness fixes that previously existed only in the
