@@ -58,13 +58,31 @@ static const std::string* enumNameForDDSCompatValue(const EnumDefinition* enum_d
   return nullptr;
 }
 
-// Append a @key suffix to the leaf. A field can be reached through several @key
-// levels (e.g. ".../value[ArmID:3][J1]"), so suffixes accumulate rather than
-// overwrite. They are rolled back per scope by resizing key_suffixes.
+// Push a @key bracket value (content only; the renderer adds the surrounding
+// "[" "]"). A field can be reached through several @key levels (e.g. an outer
+// "ArmID:3" and an inner "J1"); the values accumulate in order and are rolled
+// back per scope by resizing key_suffixes.
 static void pushKeySuffix(FieldLeaf& leaf, const char* data, int len) {
   KeySuffix ks;
   ks.assign(data, static_cast<size_t>(len));
   leaf.key_suffixes.push_back(ks);
+}
+
+// True if `field`'s type is a struct that declares at least one @key member.
+static bool structHasKey(const ROSField& field, const RosMessageLibrary& library) {
+  if (field.type().isBuiltin()) {
+    return false;
+  }
+  auto msg = field.getMessagePtr(library);
+  if (!msg) {
+    return false;
+  }
+  for (const auto& f : msg->fields()) {
+    if (!f.isConstant() && f.isKey()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Parser::Parser(const std::string& topic_name, const ROSType& msg_type, const std::string& definition,
@@ -136,22 +154,20 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
     if (field.type().typeID() == STRING) {
       std::string str;
       deserializer->deserializeString(str);
-      int len = snprintf(buf, sizeof(buf), "[%s]", str.c_str());
-      pushKeySuffix(leaf, buf, len);
+      pushKeySuffix(leaf, str.data(), static_cast<int>(str.size()));
     } else if (field.getEnum() != nullptr) {
       Variant var = deserializer->deserialize(INT32);
       int32_t enum_int = var.convert<int32_t>();
       const std::string* enum_name = enumNameForDDSCompatValue(field.getEnum(), enum_int);
       if (enum_name) {
-        int len = snprintf(buf, sizeof(buf), "[%s]", enum_name->c_str());
-        pushKeySuffix(leaf, buf, len);
+        pushKeySuffix(leaf, enum_name->data(), static_cast<int>(enum_name->size()));
       } else {
-        int len = snprintf(buf, sizeof(buf), "[%d]", enum_int);
+        int len = snprintf(buf, sizeof(buf), "%d", enum_int);
         pushKeySuffix(leaf, buf, len);
       }
     } else if (field.type().isBuiltin()) {
       Variant var = deserializer->deserialize(field.type().typeID());
-      int len = snprintf(buf, sizeof(buf), "[%s:%ld]", field.name().c_str(), (long)var.convert<int64_t>());
+      int len = snprintf(buf, sizeof(buf), "%s:%ld", field.name().c_str(), (long)var.convert<int64_t>());
       pushKeySuffix(leaf, buf, len);
     }
   }
@@ -207,7 +223,13 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
     const auto& dims = field.arrayDimensions();
     const bool is_multidim = dims.size() > 1;
 
-    if (is_array) {
+    // A sequence/array of keyed structs identifies its elements by @key value
+    // rather than by position, so the numeric index is suppressed: the
+    // element's @key fills the bracket instead (see cachePathsImpl).
+    const bool elem_keyed = is_array && structHasKey(field, _schema->msg_library);
+    const bool push_index = is_array && !elem_keyed;
+
+    if (push_index) {
       if (is_multidim) {
         // Push one index entry per dimension
         for (size_t d = 0; d < dims.size(); d++) {
@@ -242,10 +264,15 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
     } else {
       bool DO_STORE_ARRAY = DO_STORE;
       for (int i = 0; i < array_size; i++) {
+        // Roll back @key brackets pushed by the previous keyed element so they
+        // do not accumulate across iterations of the sequence.
+        if (elem_keyed) {
+          leaf.key_suffixes.resize(saved_key_suffix_size);
+        }
         if (DO_STORE_ARRAY && i >= static_cast<int32_t>(_max_array_size)) {
           DO_STORE_ARRAY = false;
         }
-        if (is_array && DO_STORE_ARRAY) {
+        if (push_index && DO_STORE_ARRAY) {
           if (is_multidim) {
             // Compute multi-dimensional indices from flat index
             int flat = i;

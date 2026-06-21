@@ -105,6 +105,15 @@ class TreeNode {
     return _bracket_count;
   }
 
+  /// Bitmask: bit i is set when the i-th bracket placeholder of cachedPath()
+  /// is filled with a @key value rather than a numeric array index.
+  uint8_t bracketKeyMask() const {
+    return _bracket_key_mask;
+  }
+  void setBracketKeyMask(uint8_t mask) {
+    _bracket_key_mask = mask;
+  }
+
   void setCachedPath(std::string path) {
     _cached_path = std::move(path);
     _bracket_count = 0;
@@ -128,6 +137,7 @@ class TreeNode {
   std::string _cached_path;
   uint16_t _bracket_offsets[max_brackets] = {};
   uint8_t _bracket_count = 0;
+  uint8_t _bracket_key_mask = 0;
 };
 
 template <typename T>
