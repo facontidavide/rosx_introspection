@@ -2,6 +2,17 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.1.2 (2026-09-12)
+------------------
+* Fix: a CDR sequence length was read as unsigned but stored in ``int32_t``; a length
+  with the high bit set wrapped negative, bypassed the max-array guard, parsed the
+  sequence as empty and let following fields be read from element bytes while
+  ``deserialize()`` still reported success. The length is now unsigned and rejected
+  when it exceeds the remaining bytes, at both walk sites (#47).
+* Convert package share paths to strings for RoboStack/rolling (#45, Tobias Fischer).
+* CI: add Lyrical to the matrix (#44).
+* Contributors: Davide Faconti, Tobias Fischer
+
 3.1.1 (2026-06-21)
 ------------------
 * DDS ``@key`` members now contribute to the field path *in position*: the key
