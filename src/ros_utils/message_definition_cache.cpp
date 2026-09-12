@@ -73,7 +73,7 @@ const MessageSpec& MessageDefinitionCache::load_message_spec(const std::string& 
   std::string package = match[1];
   std::string share_dir;
 #if AMENT_INDEX_CPP_VERSION_GTE(1, 13, 2)
-  share_dir = ament_index_cpp::get_package_share_path(package);
+  share_dir = ament_index_cpp::get_package_share_path(package).string();
 #else
   share_dir = ament_index_cpp::get_package_share_directory(package);
 #endif
