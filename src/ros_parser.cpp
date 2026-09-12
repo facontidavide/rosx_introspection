@@ -216,7 +216,14 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
 
     int32_t array_size = field.arraySize();
     if (array_size == -1) {
-      array_size = deserializer->deserializeUInt32();
+      // CDR sequence length is unsigned; assigning it to int32_t directly can wrap
+      // negative and slip past the _max_array_size guard below. Reject a length
+      // that could not fit in the remaining buffer instead.
+      const uint32_t declared_size = deserializer->deserializeUInt32();
+      if (declared_size > deserializer->bytesLeft()) {
+        throw std::runtime_error("Buffer overrun in walkSchema (declared sequence length exceeds remaining bytes)");
+      }
+      array_size = static_cast<int32_t>(declared_size);
     }
 
     const bool is_array = field.isArray();
@@ -473,7 +480,13 @@ bool Parser::deserializeIntoJson(
 
       int32_t array_size = field.arraySize();
       if (array_size == -1) {
-        array_size = deserializer->deserializeUInt32();
+        // See the matching guard in walkImpl: a CDR sequence length is unsigned
+        // and must not be trusted past what the buffer actually has left.
+        const uint32_t declared_size = deserializer->deserializeUInt32();
+        if (declared_size > deserializer->bytesLeft()) {
+          throw std::runtime_error("Buffer overrun in deserializeIntoJson (declared sequence length exceeds remaining bytes)");
+        }
+        array_size = static_cast<int32_t>(declared_size);
       }
 
       const bool skip_large_byte_array =

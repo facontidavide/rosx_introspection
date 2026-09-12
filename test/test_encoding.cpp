@@ -214,6 +214,29 @@ TEST(ParserFlatMessage, LargeUint8ArrayShouldBeBlob) {
   EXPECT_EQ(flat.value.size(), 0u);
 }
 
+TEST(ParserFlatMessage, HighBitSequenceLengthShouldThrowNotLeak) {
+  // Declared length 0x80000000 wraps negative as int32_t, so the element loop
+  // used to run zero times and "after" got read from what should have been
+  // sequence element bytes. Must throw instead of silently returning 42.
+  Parser parser("topic", ROSType("my_pkg/Test"), "uint32[] samples\nuint32 after\n");
+
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(0x80000000);
+  serializer.serialize(UINT32, Variant(uint32_t(42)));
+
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  auto buffer = Span<const uint8_t>(
+      reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize());
+
+  EXPECT_THROW(parser.deserialize(buffer, &flat, &deserializer), std::runtime_error);
+
+  for (const auto& kv : flat.value) {
+    EXPECT_NE(kv.second.convert<uint32_t>(), 42u) << kv.first.toStdString();
+  }
+}
+
 TEST(ParserJson, NegativeInt8ShouldNotAbort) {
   if (!HasJsonSupport()) {
     GTEST_SKIP() << "JSON support disabled in this build";
