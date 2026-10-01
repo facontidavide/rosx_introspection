@@ -20,8 +20,7 @@ bool HasJsonSupport() {
   std::string json;
   try {
     return parser.deserializeIntoJson(
-        Span<const uint8_t>(
-            reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+        Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
         &json, &deserializer);
   } catch (const std::runtime_error& ex) {
     if (std::string(ex.what()).find("without JSON support") != std::string::npos) {
@@ -32,6 +31,18 @@ bool HasJsonSupport() {
 }
 
 }  // namespace
+
+TEST(NanoDeserializer, RejectsTruncatedCdrHeader) {
+  NanoCDR_Deserializer deserializer;
+  const uint8_t header[] = {0, 1, 0, 0};
+  for (size_t size = 0; size < sizeof(header); ++size) {
+    EXPECT_THROW(deserializer.init(Span<const uint8_t>(header, size)), std::runtime_error);
+  }
+  EXPECT_THROW(deserializer.init(Span<const uint8_t>{}), std::runtime_error);
+  // A complete header is a valid CDR payload for an empty ROS message.
+  EXPECT_NO_THROW(deserializer.init(Span<const uint8_t>(header, sizeof(header))));
+  EXPECT_EQ(deserializer.bytesLeft(), 0u);
+}
 
 TEST(NanoSerializer, RoundTrip) {
   // Create and initialize serializer
@@ -227,8 +238,8 @@ TEST(ParserFlatMessage, HighBitSequenceLengthShouldThrowNotLeak) {
 
   FlatMessage flat;
   NanoCDR_Deserializer deserializer;
-  auto buffer = Span<const uint8_t>(
-      reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize());
+  auto buffer =
+      Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize());
 
   EXPECT_THROW(parser.deserialize(buffer, &flat, &deserializer), std::runtime_error);
 
@@ -339,8 +350,8 @@ TEST(Msgpack, DirectWriterMatchesTwoStep) {
   serializer.serialize(UINT8, Variant(uint8_t(2)));
   serializer.serialize(UINT8, Variant(uint8_t(3)));
 
-  auto buffer = Span<const uint8_t>(
-      reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize());
+  auto buffer =
+      Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize());
 
   // Two-step: deserialize + convertToMsgpack
   FlatMessage flat;
