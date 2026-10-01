@@ -415,8 +415,13 @@ inline void swapEndianness(T& val)
 }
 
 inline Decoder::Decoder(ConstBuffer buffer, CdrVersion default_cdr)
-  : buffer_(buffer), origin_(buffer.data() + 4)
+  : buffer_(buffer)
 {
+  if (!buffer_.data() || buffer_.size() < 4)
+  {
+    throw std::runtime_error("Invalid CDR header: null or truncated buffer");
+  }
+  origin_ = buffer_.data() + 4;
   const auto* ptr = buffer_.data();
   uint8_t dummy = ptr[0];
   if (dummy != 0)
