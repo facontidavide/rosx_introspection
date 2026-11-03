@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "json_support.hpp"
 #include "rosx_introspection/deserializer.hpp"
 #include "rosx_introspection/msgpack_utils.hpp"
 #include "rosx_introspection/ros_message.hpp"
@@ -7,30 +8,6 @@
 #include "rosx_introspection/serializer.hpp"
 
 using namespace RosMsgParser;
-
-namespace {
-
-bool HasJsonSupport() {
-  Parser parser("topic", ROSType("my_pkg/Test"), "uint32 value\n");
-  NanoCDR_Serializer serializer;
-  serializer.reset();
-  serializer.serialize(UINT32, Variant(uint32_t(0)));
-
-  NanoCDR_Deserializer deserializer;
-  std::string json;
-  try {
-    return parser.deserializeIntoJson(
-        Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
-        &json, &deserializer);
-  } catch (const std::runtime_error& ex) {
-    if (std::string(ex.what()).find("without JSON support") != std::string::npos) {
-      return false;
-    }
-    throw;
-  }
-}
-
-}  // namespace
 
 TEST(NanoDeserializer, RejectsTruncatedCdrHeader) {
   NanoCDR_Deserializer deserializer;
@@ -180,9 +157,7 @@ TEST(NanoDeserializer, EmptyByteSequence) {
 }
 
 TEST(ParserJson, LargeArrayShouldNotCorruptFollowingFields) {
-  if (!HasJsonSupport()) {
-    GTEST_SKIP() << "JSON support disabled in this build";
-  }
+  SKIP_WITHOUT_JSON();
 
   Parser parser("topic", ROSType("my_pkg/Test"), "uint8[] data\nuint32 tail\n");
 
@@ -249,9 +224,7 @@ TEST(ParserFlatMessage, HighBitSequenceLengthShouldThrowNotLeak) {
 }
 
 TEST(ParserJson, NegativeInt8ShouldNotAbort) {
-  if (!HasJsonSupport()) {
-    GTEST_SKIP() << "JSON support disabled in this build";
-  }
+  SKIP_WITHOUT_JSON();
 
   ASSERT_EXIT(
       {
@@ -272,9 +245,7 @@ TEST(ParserJson, NegativeInt8ShouldNotAbort) {
 }
 
 TEST(ParserJson, OmittedBoolShouldDefaultToFalse) {
-  if (!HasJsonSupport()) {
-    GTEST_SKIP() << "JSON support disabled in this build";
-  }
+  SKIP_WITHOUT_JSON();
 
   ASSERT_EXIT(
       {
@@ -295,9 +266,7 @@ TEST(ParserJson, OmittedBoolShouldDefaultToFalse) {
 }
 
 TEST(ParserJson, MalformedJsonShouldNotAbort) {
-  if (!HasJsonSupport()) {
-    GTEST_SKIP() << "JSON support disabled in this build";
-  }
+  SKIP_WITHOUT_JSON();
 
   ASSERT_EXIT(
       {
