@@ -2,6 +2,17 @@
 Changelog for package rosx_introspection
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.1.3 (2026-11-03)
+------------------
+* Fix: IDL annotation arguments may contain quoted text with commas, parentheses and
+  escaped quotes, character literals and comments, as rosidl writes ``@verbatim``
+  annotations. Such schemas failed to parse (#48, PlotJuggler/PlotJuggler#851).
+* Fix: a null or shorter-than-four-byte CDR buffer is rejected with
+  ``std::runtime_error`` before the encapsulation header is read, instead of
+  dereferencing a null pointer (#49, PlotJuggler/PlotJuggler#1315).
+* Tests: the JSON tests are skipped when built with ``ROSX_HAS_JSON=OFF`` (#50).
+* Contributors: Davide Faconti
+
 3.1.2 (2026-09-12)
 ------------------
 * Fix: a CDR sequence length was read as unsigned but stored in ``int32_t``; a length
