@@ -9,6 +9,18 @@
 
 using namespace RosMsgParser;
 
+TEST(NanoDeserializer, RejectsTruncatedCdrHeader) {
+  NanoCDR_Deserializer deserializer;
+  const uint8_t header[] = {0, 1, 0, 0};
+  for (size_t size = 0; size < sizeof(header); ++size) {
+    EXPECT_THROW(deserializer.init(Span<const uint8_t>(header, size)), std::runtime_error);
+  }
+  EXPECT_THROW(deserializer.init(Span<const uint8_t>{}), std::runtime_error);
+  // A complete header is a valid CDR payload for an empty ROS message.
+  EXPECT_NO_THROW(deserializer.init(Span<const uint8_t>(header, sizeof(header))));
+  EXPECT_EQ(deserializer.bytesLeft(), 0u);
+}
+
 TEST(NanoSerializer, RoundTrip) {
   // Create and initialize serializer
   NanoCDR_Serializer serializer;
