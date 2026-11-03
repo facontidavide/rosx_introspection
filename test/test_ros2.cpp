@@ -5,6 +5,7 @@
 #include <std_msgs/msg/header.hpp>
 #include <std_msgs/msg/string.hpp>
 
+#include "json_support.hpp"
 #include "rosx_introspection/ros_parser.hpp"
 #include "rosx_introspection/ros_utils/ros2_helpers.hpp"
 
@@ -131,6 +132,8 @@ void CheckEncoding(const sensor_msgs::msg::JointState& joint_state) {
 }
 
 TEST(ParseROS2, JointState_JSON) {
+  SKIP_WITHOUT_JSON();
+
   const std::string topic_type = "sensor_msgs/JointState";
 
   Parser parser("joint_state", ROSType(topic_type), GetMessageDefinition(topic_type));
@@ -165,6 +168,8 @@ TEST(ParseROS2, JointState_JSON) {
 }
 
 TEST(ParseROS2, JointState_JSON_Omitted) {
+  SKIP_WITHOUT_JSON();
+
   const char* joint_state_json = R"(
     {"header":{"stamp":{"sec":1234,"nanosec":567000000}},
      "name":["hola","ciao"],
@@ -201,6 +206,8 @@ TEST(ParseROS2, JointState_JSON_Omitted) {
 }
 
 TEST(ParseROS2, PoseStamped_JSON) {
+  SKIP_WITHOUT_JSON();
+
   const std::string topic_type = "geometry_msgs/PoseStamped";
 
   Parser parser("joint_state", ROSType(topic_type), GetMessageDefinition(topic_type));
@@ -249,6 +256,8 @@ TEST(ParseROS2, PoseStamped_JSON) {
 }
 
 TEST(ParseROS2, PoseStamped_JSON_Omitted) {
+  SKIP_WITHOUT_JSON();
+
   const char* pose_stamped_json = R"(
     {"header":{"stamp":{"sec":1234,"nanosec":567000000},"frame_id":"base"},
      "pose":{"position":{"x":1.0,"y":2.0,"z":3.0}}
@@ -280,6 +289,8 @@ TEST(ParseROS2, PoseStamped_JSON_Omitted) {
 }
 
 TEST(ParseROS2, Duration) {
+  SKIP_WITHOUT_JSON();
+
   const char* durationA_json = R"({"sec":123,"nanosec":456})";
 
   const std::string topic_type = "builtin_interfaces/Duration";
