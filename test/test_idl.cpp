@@ -31,6 +31,35 @@ TEST(IDLParser, SimpleStruct) {
   EXPECT_EQ(schema->root_msg->field(2).name(), "z");
 }
 
+TEST(IDLParser, AnnotationArgumentsRespectQuotedText) {
+  const char* idl = R"idl(
+module TestModule {
+  @verbatim(language="comment", text="Desired \"(left, positive)\" angle" " or right (negative)")
+  struct Command {
+    @verbatim(language="comment", text="Angle (radians), left or right")
+    @default(value=0.0)
+    float angle;
+    int32 count;
+    @default(value='"')
+    char quote;
+    @default(value=0 /* user's default */)
+    int32 commented;
+  };
+};
+)idl";
+  auto schema = ParseIDL("test_topic", ROSType("TestModule/Command"), idl);
+  ASSERT_NE(schema, nullptr);
+  ASSERT_EQ(schema->root_msg->fields().size(), 4u);
+  EXPECT_EQ(schema->root_msg->field(0).name(), "angle");
+  EXPECT_EQ(schema->root_msg->field(0).type().typeID(), FLOAT32);
+  EXPECT_EQ(schema->root_msg->field(1).name(), "count");
+  EXPECT_EQ(schema->root_msg->field(1).type().typeID(), INT32);
+  EXPECT_EQ(schema->root_msg->field(2).name(), "quote");
+  EXPECT_EQ(schema->root_msg->field(2).type().typeID(), CHAR);
+  EXPECT_EQ(schema->root_msg->field(3).name(), "commented");
+  EXPECT_EQ(schema->root_msg->field(3).type().typeID(), INT32);
+}
+
 static const char* ENUM_IDL = R"(
 module TestModule {
   enum Color {

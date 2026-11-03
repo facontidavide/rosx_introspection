@@ -74,7 +74,7 @@ PRIMARY_EXPR    <- OPEN_PAREN CONST_EXPR CLOSE_PAREN / FLOAT_LITERAL / HEX_LITER
 ANNOTATION      <- WS? '@' ANNOTATION_NAME ANNOTATION_ARGS? WS?
 ANNOTATION_NAME <- < [a-zA-Z_][a-zA-Z0-9_]* >
 ANNOTATION_ARGS <- OPEN_PAREN ANNOTATION_PARAM (COMMA ANNOTATION_PARAM)* CLOSE_PAREN
-ANNOTATION_PARAM <- < (!(')' / ',') .)+ >
+ANNOTATION_PARAM <- < (WS / STRING_LITERAL / CHAR_LITERAL / !(')' / ',' / '"' / "'") .)+ >
 
 # Identifiers and scoped names
 SCOPED_NAME     <- < IDENTIFIER (DOUBLE_COLON IDENTIFIER)* >
@@ -84,7 +84,8 @@ IDENTIFIER      <- < [a-zA-Z_][a-zA-Z0-9_]* >
 FLOAT_LITERAL   <- < [0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)? / '.' [0-9]+ ([eE] [+-]? [0-9]+)? / [0-9]+ [eE] [+-]? [0-9]+ >
 HEX_LITERAL     <- < '0' [xX] [0-9a-fA-F]+ >
 DEC_LITERAL     <- < [0-9]+ >
-STRING_LITERAL  <- < '"' (!'"' .)* '"' >
+STRING_LITERAL  <- < '"' ('\\' . / !('"' / '\\') .)* '"' >
+CHAR_LITERAL    <- < "'" ('\\' . / !("'" / '\\') .)* "'" >
 
 # Preprocessor directives (stripped)
 PREPROCESSOR    <- WS? '#' (!EOL .)* EOL?
