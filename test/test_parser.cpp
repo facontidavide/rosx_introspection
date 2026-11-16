@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "rosx_introspection/ros_message.hpp"
+#include "rosx_introspection/ros_parser.hpp"
 #include "rosx_introspection/stringtree_leaf.hpp"
 
 const std::string vector_def =
@@ -204,4 +205,72 @@ TEST(Parser, BoundedSequence) {
   EXPECT_FALSE(fixed.isUpperBound());
 
   EXPECT_FALSE(msg.field(3).isArray());
+}
+
+namespace {
+// Records what a schema walk hands to a MessageWriter.
+struct RecordingWriter : MessageWriter {
+  std::vector<std::string> values;  // "<field>=<value>"
+  std::vector<std::pair<std::string, size_t>> blobs;
+  void writeValue(const FieldLeaf& leaf, const Variant& value) override {
+    values.push_back(leaf.node->value()->name() + "=" + std::to_string(value.convert<int64_t>()));
+  }
+  void writeString(const FieldLeaf&, const std::string&) override {}
+  void writeEnum(const FieldLeaf&, int32_t, const std::string&) override {}
+  void writeBlob(const FieldLeaf& leaf, Span<const uint8_t> data) override {
+    blobs.emplace_back(leaf.node->value()->name(), data.size());
+  }
+};
+}  // namespace
+
+TEST(Parser, ByteSequenceBlobThreshold) {
+  Parser parser("topic", ROSType("pkg/Bytes"), "uint8[] data\nint8[] small\nuint8[3] fixed\nint16[] words\n", ROS_MSG);
+  NanoCDR_Serializer serializer;
+  serializer.reset();
+  serializer.serializeUInt32(5);
+  for (int i = 0; i < 5; i++) {
+    serializer.serialize(UINT8, Variant(uint8_t(i)));
+  }
+  serializer.serializeUInt32(1);
+  serializer.serialize(INT8, Variant(int8_t(-1)));
+  for (int i = 0; i < 3; i++) {
+    serializer.serialize(UINT8, Variant(uint8_t(7)));
+  }
+  serializer.serializeUInt32(2);
+  serializer.serialize(INT16, Variant(int16_t(300)));
+  serializer.serialize(INT16, Variant(int16_t(301)));
+  const auto* data = reinterpret_cast<const uint8_t*>(serializer.getBufferData());
+  const Span<const uint8_t> buffer(data, serializer.getBufferSize());
+
+  // Default: off. Short byte sequences arrive one value per byte.
+  NanoCDR_Deserializer deserializer;
+  RecordingWriter plain;
+  ASSERT_TRUE(parser.walkSchema(buffer, &deserializer, &plain));
+  EXPECT_TRUE(plain.blobs.empty());
+  EXPECT_EQ(plain.values.size(), 5u + 1u + 3u + 2u);
+
+  // Threshold 0: every non-empty byte sequence is one blob; fixed arrays and wider
+  // sequences are unchanged.
+  parser.setByteSequenceBlobThreshold(0);
+  RecordingWriter blob;
+  ASSERT_TRUE(parser.walkSchema(buffer, &deserializer, &blob));
+  ASSERT_EQ(blob.blobs.size(), 2u);
+  EXPECT_EQ(blob.blobs[0], std::make_pair(std::string("data"), size_t(5)));
+  EXPECT_EQ(blob.blobs[1], std::make_pair(std::string("small"), size_t(1)));
+  EXPECT_EQ(blob.values, (std::vector<std::string>{"fixed=7", "fixed=7", "fixed=7", "words=300", "words=301"}));
+
+  // Threshold 2: only the 5-byte sequence passes it.
+  parser.setByteSequenceBlobThreshold(2);
+  RecordingWriter some;
+  ASSERT_TRUE(parser.walkSchema(buffer, &deserializer, &some));
+  ASSERT_EQ(some.blobs.size(), 1u);
+  EXPECT_EQ(some.blobs[0].first, "data");
+}
+
+TEST(Parser, MaxArraySizeUpTo65535) {
+  Parser parser("topic", ROSType("pkg/Bytes"), "float64[] values\n", ROS_MSG);
+  EXPECT_NO_THROW(parser.setMaxArrayPolicy(Parser::KEEP_LARGE_ARRAYS, 65535));
+  EXPECT_EQ(parser.maxArraySize(), 65535u);
+  EXPECT_THROW(parser.setMaxArrayPolicy(Parser::KEEP_LARGE_ARRAYS, 65536), std::runtime_error);
+  EXPECT_EQ(parser.maxArraySize(), 65535u);  // unchanged by the refused call
 }

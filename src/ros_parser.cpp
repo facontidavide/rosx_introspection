@@ -247,9 +247,10 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
       }
     }
 
-    bool IS_BLOB = false;
+    bool IS_BLOB = field.arraySize() == -1 && field_type.isBuiltin() && builtinSize(field_type.typeID()) == 1 &&
+                   static_cast<size_t>(array_size) > _byte_sequence_blob_min;
 
-    if (array_size > static_cast<int32_t>(_max_array_size)) {
+    if (!IS_BLOB && array_size > static_cast<int32_t>(_max_array_size)) {
       if (builtinSize(field_type.typeID()) == 1) {
         IS_BLOB = true;
       } else {
