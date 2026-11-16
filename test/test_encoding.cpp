@@ -346,3 +346,36 @@ TEST(ROSDeserializer, UnsupportedTypeShouldThrow) {
 
   EXPECT_THROW(deserializer.deserialize(OTHER), std::runtime_error);
 }
+
+// String values are read into one buffer reused by every walk. Each message must
+// still yield exactly its own strings: long after short, short after long, empty,
+// and several per message.
+TEST(ParserFlatMessage, StringsAreExactAcrossMessages) {
+  Parser parser("topic", ROSType("my_pkg/Test"), "string a\nuint32 n\nstring b\nstring[] c\n");
+  const std::vector<std::vector<std::string>> messages = {
+      {"short", "a string well beyond the small string buffer", "x", ""},
+      {"", "tiny", "another string long enough to live on the heap", "y"},
+      {"a third string, long enough to need the heap again", "", "", ""},
+  };
+  FlatMessage flat;
+  NanoCDR_Deserializer deserializer;
+  for (const auto& m : messages) {
+    NanoCDR_Serializer serializer;
+    serializer.reset();
+    serializer.serializeString(m[0]);
+    serializer.serialize(UINT32, Variant(uint32_t(7)));
+    serializer.serializeString(m[1]);
+    serializer.serializeUInt32(2);
+    serializer.serializeString(m[2]);
+    serializer.serializeString(m[3]);
+    ASSERT_TRUE(parser.deserialize(
+        Span<const uint8_t>(reinterpret_cast<const uint8_t*>(serializer.getBufferData()), serializer.getBufferSize()),
+        &flat, &deserializer));
+    ASSERT_EQ(flat.value.size(), 5u);
+    EXPECT_EQ(flat.value[0].second.extract<std::string>(), m[0]);
+    EXPECT_EQ(flat.value[1].second.convert<uint32_t>(), 7u);
+    EXPECT_EQ(flat.value[2].second.extract<std::string>(), m[1]);
+    EXPECT_EQ(flat.value[3].second.extract<std::string>(), m[2]);
+    EXPECT_EQ(flat.value[4].second.extract<std::string>(), m[3]);
+  }
+}

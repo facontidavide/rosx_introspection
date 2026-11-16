@@ -118,6 +118,18 @@ ROSMessage::Ptr Parser::getMessageByType(const ROSType& type) const {
 // Unified schema walk: walkSchema()
 //=============================================================================
 
+namespace {
+// Buffer for the string values of a walk. A string is read into it and handed to
+// the writer by const reference before the walk reads anything else, so one buffer
+// per thread serves every message: its capacity carries over, and a steady stream
+// of messages allocates nothing for their strings. (A writer must not start another
+// walk on the same thread from inside writeString(), which no writer does.)
+std::string& walkStringBuffer() {
+  thread_local std::string buffer;
+  return buffer;
+}
+}  // namespace
+
 bool Parser::walkSchema(Span<const uint8_t> buffer, Deserializer* deserializer, MessageWriter* writer) const {
   deserializer->init(buffer);
 
@@ -152,7 +164,7 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
 
     char buf[96];
     if (field.type().typeID() == STRING) {
-      std::string str;
+      std::string& str = walkStringBuffer();
       deserializer->deserializeString(str);
       pushKeySuffix(leaf, str.data(), static_cast<int>(str.size()));
     } else if (field.getEnum() != nullptr) {
@@ -339,7 +351,7 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
 
           if (active_case) {
             if (active_case->type.typeID() == STRING) {
-              std::string str;
+              std::string& str = walkStringBuffer();
               deserializer->deserializeString(str);
               if (DO_STORE_ARRAY) {
                 writer->writeString(leaf, str);
@@ -359,7 +371,7 @@ void Parser::walkImpl(const ROSMessage* msg, FieldLeaf& leaf, bool store, WalkSt
             }
           }
         } else if (field_type.typeID() == STRING) {
-          std::string str;
+          std::string& str = walkStringBuffer();
           deserializer->deserializeString(str);
           if (DO_STORE_ARRAY) {
             writer->writeString(leaf, str);
