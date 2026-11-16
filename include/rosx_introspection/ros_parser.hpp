@@ -62,13 +62,30 @@ class Parser {
   enum MaxArrayPolicy : bool { DISCARD_LARGE_ARRAYS = true, KEEP_LARGE_ARRAYS = false };
 
   /// Default values are DISCARD_LARGE_ARRAYS and 100.
-  /// The maximum permissible value of max_array_size is 10.000 (but don't)
+  /// The maximum permissible value of max_array_size is 65535: an array index is 16 bits
+  /// in FieldLeaf. Arrays this long are expensive in a FlatMessage; a MessageWriter that
+  /// consumes values as they come (walkSchema) is the intended user of large values.
   void setMaxArrayPolicy(MaxArrayPolicy discard_entire_array, size_t max_array_size) {
+    if (max_array_size > kMaxArraySizeLimit) {
+      throw std::runtime_error("max_array_size limited to 65535 at most");
+    }
     _discard_large_array = discard_entire_array;
     _max_array_size = max_array_size;
-    if (_max_array_size > 10000) {
-      throw std::runtime_error("max_array_size limited to 10000 at most");
-    }
+  }
+
+  static constexpr size_t kMaxArraySizeLimit = 65535;
+
+  /// A sequence of 1-byte builtins (uint8, int8, char, byte, bool) with more than
+  /// `min_size` elements is handed whole to MessageWriter::writeBlob, at any length and
+  /// whatever max_array_size says: one call instead of one Variant per byte. Fixed-size
+  /// arrays are not affected. Default: SIZE_MAX (off). 0 makes every non-empty byte
+  /// sequence a blob.
+  void setByteSequenceBlobThreshold(size_t min_size) {
+    _byte_sequence_blob_min = min_size;
+  }
+
+  size_t byteSequenceBlobThreshold() const {
+    return _byte_sequence_blob_min;
   }
 
   MaxArrayPolicy maxArrayPolicy() const {
@@ -190,6 +207,7 @@ class Parser {
   std::vector<int8_t> _substituted;
   MaxArrayPolicy _discard_large_array;
   size_t _max_array_size;
+  size_t _byte_sequence_blob_min = SIZE_MAX;
   BlobPolicy _blob_policy;
   mutable size_t _estimated_field_count = 0;
   std::shared_ptr<ROSField> _dummy_root_field;
